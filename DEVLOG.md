@@ -1,0 +1,15 @@
+# DEVLOG.md — Журнал разработки
+
+## [2026-09-06] Подключение Tavily MCP
+**Запрос:** включить Tavily MCP для веб-поиска
+**План:** проверить конфиг opencode, найти API-ключ в bashrc, прописать в глобальный конфиг
+**Результат:** ключ прописан напрямую в `~/.config/opencode/opencode.jsonc` ( вместо `{env:TAVILY_API_KEY}` который не резолвился)
+**Проверка:** `list_mcp_resources` — Tavily не показывает ресурсы (только тулзы), но тулзы `tavily_tavily_search`, `tavily_tavily_extract`, `tavily_tavily_crawl`, `tavily_tavily_map`, `tavily_tavily_research` доступны в списке инструментов
+**Правки:** нет
+
+## [2026-09-06] Подключение провайдера RouterAI (z-ai/glm-5.3-flash)
+**Запрос:** настроить opencode на модель `z-ai/glm-5.3-flash` через routerai.ru
+**План:** проверить эндпоинты через API (`/v1/models/{author}/{slug}/endpoints`), выбрать провайдера (Novita — лучшая цена 9.29/30.95 ₽ за 1M + полный набор параметров), добавить кастомный провайдер в `opencode.json` через `@ai-sdk/openai-compatible`
+**Результат:** провайдер `routerai` прописан в `opencode.json` (baseURL `https://routerai.ru/api/v1`), создан `.env.example`, ключ экспортирован в `~/.bashrc`
+**Проверка:** curl к `/v1/chat/completions` вернул HTTP 200 и осмысленный ответ модели (55 токенов). Первый запуск в opencode дал `401 Unauthorized` — `{env:ROUTERAI_API_KEY}` не резолвится в поле `apiKey` провайдера
+**Правки:** ключ прописан напрямую в `opencode.json`, файл добавлен в `.gitignore` (секрет не попадёт в репозиторий). Цикл исправления бага: 401 → замена env-ссылки на прямой ключ → перезапуск
