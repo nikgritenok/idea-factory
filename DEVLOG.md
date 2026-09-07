@@ -1,5 +1,24 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-07 / шаг 4] Очередь задач + LangGraph-воркер (checkpointing, управление)
+**Запрос:** этап 4 плана — постоянный воркер, LangGraph.js state graph, checkpointing в Postgres (PostgresSaver), приоритеты с anti-starvation, пауза/продолжение/отмена/повтор шага/смена приоритета, лимит 10 активных идей, идемпотентность enqueue
+**План:** использовать LangGraph.js (отраслевой стандарт) вместо кастомного stateGraph; дождаться стабильного релиза; queue на PostgreSQL (кастомная, не LangGraph — для приоритетов/anti-starvation); PostgresSaver для checkpointing; fixture executor для прототипа (стек 7 шагов из config/pipeline.ts)
+**Результат:** `server/queue/` — enqueue, claim, priority, checkpointer, worker (AnalysisWorker с buildGraph/executeJob/streamJob/replayFromCheckpoint), controls (pause/resume/cancel/retryStep/setPriority), executors (fixture + registry), types; API: `POST /api/ideas/:id/run`, `GET /api/jobs/:id`, `POST /api/jobs/:id/{pause,resume,cancel,retry-step}`, `PATCH /api/jobs/:id/priority`; `server/plugins/worker.ts` (WORKER_MODE=true), `server/queue/worker-cli.ts` (npm run worker); package.json: @langchain/langgraph@1.4.14, @langchain/langgraph-checkpoint-postgres@1.0.5, pg@8.23.0
+**Проверка:** `npx vitest run` — 37 тестов (13 queue + 10 worker + 7 migrate + 5 ideas + 2 stt), все проходят; lint чистый; `npm run build` проходит; ручной прогон: curl создаёт идею, enqueue через POST /run, worker обрабатывает 7 шагов → status=done, retry-step с time-travel перезапускает с указанного шага
+**Правки:** 4 цикла исправления: (1) vite dev server хостил на 5173 а не 3000 — исправлено на --port 3000; (2) vite dev не подхватывал DATABASE_URL из env — запуск через `DATABASE_URL=... npx nuxi dev`; (3) `graph.invoke(null, historicalConfig)` выбрасывал "Received no input writes for __start__" в тесте retry-step — ошибка была в `target.config` вместо `target` (findCheckpointBefore уже возвращает config, а не snapshot); (4) импорт `beforeAll` потерян из migrate.test.ts при предыдущем автофиксе — добавлен обратно; (5) неправильные импорт-пути в API роутах (`../../../../` вместо `../../../` для файлов на уровне `server/api/jobs/[id]/`)
+
+### Ключевые архитектурные решения
+
+1. **LangGraph.js вместо кастомного stateGraph**: используется `StateGraph` с `Annotation.Root`, типизированный ввод/вывод; `graph.stream(input, config)` для обычного потока, `graph.invoke(null, historicalConfig)` для time-travel replay (唯一 рабочий способ, stream бросает ошибку для завершённых потоков)
+
+2. **Два checkpoint-пула**: основной (`mainCheckpointer`) — для pipeline checkpoints LangGraph (из `server/utils/db.ts`); воркер создаёт свой пул через `createCheckpointer()` из `server/queue/checkpointer.ts` — оба указывают на одну БД, но независимы для изоляции
+
+3. **Queue vs LangGraph checkpointing**: кастомная очередь (`queue_jobs`) — для приоритетов, anti-starvation, лимита 10 идей; LangGraph checkpointing — для восстановления состояния графа (values + next node). Это стандартный паттерн (pg-boss, bullmq).
+
+4. **Fixture executor**: реестр исполнителей (`registerExecutor`) позволяет подключать реальные ИИ-вызовы на этапе 5; fixture-реализация делает `FIXTURE: Orchestrator step` за 50ms с имитацией checkpoint state
+
+5. **Одна задача**: воркер берёт только одну задачу из очереди (не параллелизм всех 10), работает пока не остановлен (persistent worker, TZ §8)
+
 ## [2026-09-07 / шаг 3] Голос → карточка: STT + API идей
 **Запрос:** этап 3 плана — запись аудио, реальная расшифровка через routerai STT, текстовый fallback, лимиты
 **План:** server utils `stt.ts` (multipart → /api/v1/audio/transcriptions, model=microsoft/mai-transcribe-2, language=ru), API `POST /api/transcribe` (лимиты 25 МБ / 10 мин, пустая расшифровка → ok:false с сообщением), API `GET/POST /api/ideas` (лимит 10 активных, title из первого предложения ≤120 симв., v1 в idea_versions)

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { migrateUp, migrateDown, appliedMigrations, getSql } from './migrate'
 
 const DB = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5434/idea_factory_test'

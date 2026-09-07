@@ -11,15 +11,19 @@
     "db:migrate": "tsx server/db/migrate-cli.ts up",
     "db:down": "tsx server/db/migrate-cli.ts down",
     "db:status": "tsx server/db/migrate-cli.ts status",
+    "worker": "tsx server/queue/worker-cli.ts",
     "test": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@langchain/langgraph": "^1.4.14",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "^4.5.2",
+    "pg": "^8.23.0",
     "postgres": "^3.4.9",
     "reka-ui": "^2.10.4",
     "tailwind-merge": "^3.6.0",
@@ -30,6 +34,7 @@
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/pg": "^8.23.1",
     "eslint": "^10.10.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",

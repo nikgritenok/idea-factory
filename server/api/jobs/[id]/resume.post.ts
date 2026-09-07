@@ -1,0 +1,19 @@
+import { db } from '../../../utils/db'
+import { resumeJob, QueueControlError } from '../../../queue/controls'
+
+// POST /api/jobs/:id/resume — продолжение задачи с чекпоинта (TZ §8)
+export default defineEventHandler(async (event) => {
+  const jobId = getRouterParam(event, 'id') ?? ''
+  const sql = db()
+
+  try {
+    const job = await resumeJob(sql, jobId)
+    return { job }
+  }
+  catch (error) {
+    if (error instanceof QueueControlError) {
+      throw createError({ statusCode: error.statusCode, statusMessage: error.message })
+    }
+    throw error
+  }
+})

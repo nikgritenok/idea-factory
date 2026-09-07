@@ -4,17 +4,19 @@
 
 | Слой | Технология | Назначение |
 |------|-----------|------------|
-| Framework | Nuxt 3 | Full-stack SSR/CSR, файловый роутинг |
+| Framework | Nuxt 4.5 (Nitro) | Full-stack SSR/CSR, файловый роутинг, server routes |
 | Language | TypeScript | Строгая типизация, общая кодовая база |
-| ORM | Prisma | Типизированный доступ к БД, миграции |
-| Database | PostgreSQL | Основная реляционная БД |
-| Validation | Zod | Валидация данных на границах (клиент/сервер) |
+| ORM | postgres.js | Лёгкий SQL-first драйвер для PostgreSQL |
+| Database | PostgreSQL 16 | Основная реляционная БД (схема в `server/db/migrations/`) |
+| Validation | ручная валидация | `createError` на границах API (zone-style) |
+| AI/Orchestration | LangGraph.js 1.4 + PostgresSaver | StateGraph для пайплайна анализа, checkpointing в Postgres |
 | State | Pinia | Управление состоянием на клиенте |
-| Build | Vite | Сборка клиентской части |
-| Package manager | pnpm | Управление зависимостями |
-| Linting | ESLint | Статический анализ кода |
+| Build | Vite 8 | Сборка клиентской части |
+| Package manager | npm | Управление зависимостями |
+| Linting | ESLint + @nuxt/eslint + stylistic | Статический анализ кода |
 | Testing | Vitest | Unit-тесты, интеграционные тесты |
 | Runtime | Node.js (LTS) | Серверный рантайм |
+| Language Runtime | tsx | Запуск .ts файлов (CLI worker, миграции) |
 
 ## Структура проекта
 
@@ -29,75 +31,110 @@ app/                  # Frontend (Vue 3)
   stores/             # Pinia-сторы
 
 server/               # Backend (Nitro)
-  api/                # API-маршруты (v1/, v2/)
-  routes/             # Доп. серверные маршруты
+  api/                # API-маршруты (auto-imported by Nitro)
+    ideas/            # CRUD идей + запуск анализа
+    jobs/             # Управление задачами очереди
+  db/                 # Миграции БД, CLI для миграций
+  queue/              # Очередь задач + LangGraph-воркер
+    checkpointer.ts   # PostgresSaver (LangGraph checkpointing)
+    worker.ts         # AnalysisWorker — LangGraph StateGraph
+    worker-cli.ts     # CLI для запуска воркера
+    enqueue.ts        # Идемпотентная постановка в очередь
+    claim.ts          # Claim задач из очереди
+    controls.ts       # Pause/resume/cancel/retry-step/setPriority
+    executors.ts      # Реестр исполнителей шагов (fixture для прототипа)
+    priority.ts       # Anti-starvation формула
+    types.ts          # Интерфейсы очереди
+  plugins/            # Nitro-плагины (worker при WORKER_MODE=true)
   utils/              # Утилиты сервера
-  services/           # Бизнес-логика
-  middleware/          # Серверные middleware
+    db.ts             # Синглтон postgres.js
+    ideas.ts          # Хелперы для ideas, лимит 10 активных
+    stt.ts            # STT через routerai.ru (для этапа 5+)
 
-shared/               # Общий код (app/ + server/)
-  types/              # Общие типы
-  schemas/            # Zod-схемы
-  utils/              # Общие утилиты
+config/               # Конфиги пайплайна (steps, лимиты, очереди)
 
-prisma/               # Prisma
-  schema.prisma       # Схема БД
-  migrations/         # Миграции
-
-config/               # Конфиги ролей, промптов, лимитов
+docs/                 # Документация
+  ARCHITECTURE.md     # Этот файл
+  conventions.md      # Код-стайл и правила
 ```
+
+## Архитектура потока данных (TZ §6)
+
+```
+UI (app/) → API (Nitro routes) → Postgres (карточки, версии, аудио, источники, прогоны, расчёты)
+                                      ↓
+                          очередь + LangGraph воркер (persistent worker)
+                                      ↓
+                  ИИ-решения (routerai.ru) и микросервисы (валидатор правил)
+                                      ↓
+                          журнал прогонов → расчётный модуль → отчёт → MVP
+```
+
+### Очередь и воркер (TZ §8)
+
+- **Очередь**: кастомная на PostgreSQL (`queue_jobs`), поддержка приоритетов (high/medium/low), anti-starvation, лимит 10 активных идей
+- **Воркер**: LangGraph.js `StateGraph` с `Annotation.Root`, checkpointing через `@langchain/langgraph-checkpoint-postgres` (`PostgresSaver`)
+- **Состояние на сервере**: закрытие вкладки не останавливает выполнение; перезапуск воркера продолжает с последнего чекпоинта
+- **Управление**: пауза/продолжение/отмена/повтор шага/смена приоритета — через API (`/api/jobs/:id/*`)
+- **Режимы запуска**: 
+  - `WORKER_MODE=true` — Nitro-плагин запускает воркер в фоне (docker-compose worker service)
+  - `npm run worker` — standalone CLI (`worker-cli.ts`)
+- **Executor Registry**: плагинная архитектура исполнителей шагов (`registerExecutor`), fixture-реализация для прототипа, реальные ИИ-вызовы подключаются на этапе 5
+
+### Проверенные сценарии (автотесты + ручная проверка)
+
+| Сценарий | Тест | Статус |
+|----------|------|--------|
+| Enqueue идемпотентно | queue.test.ts | ✅ |
+| Claim с приоритетами | queue.test.ts | ✅ |
+| Anti-starvation | queue.test.ts | ✅ |
+| Параллельный claim | queue.test.ts | ✅ |
+| Key release при re-enqueue | queue.test.ts | ✅ |
+| Полный прогон (7 шагов) | worker.test.ts | ✅ |
+| Crash-restart (resume) | worker.test.ts | ✅ |
+| Pause + resume | worker.test.ts | ✅ |
+| Cancel | worker.test.ts | ✅ |
+| Failure + retry | worker.test.ts | ✅ |
+| Retry-step (time-travel) | worker.test.ts | ✅ |
+| Priority воркер | worker.test.ts | ✅ |
+| API create + enqueue + status | ручная (curl) | ✅ |
+| Retry-step через API | ручная (curl) | ✅ |
+
+### LangGraph.js — детали
+
+- **Версия**: 1.4.14 (текущая стабильная)
+- **Checkpointing**: `@langchain/langgraph-checkpoint-postgres@1.0.5` через `pg.Pool`
+- **Паттерн time-travel**: `graph.invoke(null, historicalConfig)` для replay с исторического чекпоинта
+- **Примечание**: `graph.stream(null, config)` выбрасывает ошибку для已完成ных потоков; для time-travel используется `invoke`
+- **Anti-starvation**: формула `basePriority × 10 - attempts × 2 + ageInCycles × 0.5`, clamp 0–100
 
 ## Версионирование API
 
-Стратегия: **версионирование через URL**.
+Стратегия: **версионирование через URL** (фаза 2+).
 
 ```
-/api/v1/users
-/api/v2/users
+/api/ideas          # Текущий CRUD + анализ (stage 2-4)
+/api/jobs/:id       # Управление задачами очереди (stage 4)
+/api/v1/...         # Будущее версионирование (stage 9+)
 ```
 
-Правила:
-- Номер версии — целое число в пути: `v1`, `v2`, `v3`.
-- Новая версия создаётся при breaking changes (удаление/переименование полей, изменение поведения).
-- Старые версии не удаляются до истечения поддержки (фиксированный срок или дублирование).
-- Minor-изменения (добавление полей, новая логика) — внутри текущей версии без bump.
+## Конфигурация и безопасность
 
-## Аутентификация: JWT
+- **DATABASE_URL**: только через переменные окружения, не хранится в коде
+- **API ключи** (routerai.ru): только на сервере, через `NITRO_*` env vars
+- **Prompt injection**: текст идеи — данные, а не инструкции (защита на уровне промптов)
+- **Файлы аудио**: загружаются на сервер, хранятся временно, удаляются после обработки
 
-### Access-токены
-- Живут **15 минут**.
-- Хранятся на клиенте (в памяти или localStorage — зависит от требований безопасности).
-- При каждом запросе — в заголовке `Authorization: Bearer <token>`.
+## Пакеты (ключевые зависимости)
 
-### Refresh-токены
-- Долгоживущие, хранятся в **httpOnly куках** (недоступны JS на клиенте).
-- **Ротация** при каждом использовании: старый токен инвалидируется, выдаётся новый.
-- Refresh-токены хранятся на сервере (в БД) для возможности **отзыва** (logout, смена пароля, compromised).
-
-### Флоу
-
-```
-Клиент                    Сервер                    БД
-  │                         │                        │
-  │──── login ─────────────>│                        │
-  │<─── access + refresh ───│                        │
-  │                         │                        │
-  │──── API + access ──────>│ (access валиден)       │
-  │<─── ответ ──────────────│                        │
-  │                         │                        │
-  │──── API + expired ─────>│ (access истёк)         │
-  │<─── 401 ────────────────│                        │
-  │                         │                        │
-  │──── refresh ───────────>│ (refresh валиден)      │
-  │<─── новый access ───────│ (ротация refresh)      │
-  │                         │──── сохранить ────────>│
-  │                         │                        │
-  │──── API + new access ──>│                        │
-  │<─── ответ ──────────────│                        │
-```
-
-### Правила
-- Refresh-токен валиден **один раз** — при использовании выдаётся новый, старый удаляется.
-- При компрометации — отзыв всех refresh-токенов пользователя (logout everywhere).
-- Access-токен не хранится в持久ном хранилище на клиенте.
-- Все ошибки JWT возвращают `401 Unauthorized` с стандартным форматом.
+| Пакет | Версия | Назначение |
+|-------|--------|------------|
+| `nuxt` | 4.5.2 | Framework |
+| `@langchain/langgraph` | 1.4.14 | StateGraph для пайплайна |
+| `@langchain/langgraph-checkpoint-postgres` | 1.0.5 | Checkpointing в Postgres |
+| `postgres` | 3.4.5 | SQL-first Postgres driver |
+| `pg` | 8.23.0 | node-postgres (только для LangGraph checkpointer) |
+| `tsx` | 4.21.3 | TS execution (CLI, worker) |
+| `vitest` | 3.2.4 | Тесты |
+| `@vue/test-utils` | 2.4.6 | Vue-компонент тесты |
+| `happy-dom` | 18.0.1 | DOM simulation для тестов |
