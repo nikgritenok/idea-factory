@@ -1,7 +1,6 @@
 import type { Sql } from '../db/migrate'
-import type { QueuePriority } from '../../config/pipeline'
 import { initialCheckpoint } from './claim'
-import type { JobCheckpoint, JobRow } from './types'
+import type { JobCheckpoint, JobRow, QueuePriority } from './types'
 
 export class QueueControlError extends Error {
   constructor(

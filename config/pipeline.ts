@@ -2,30 +2,15 @@
 // Этап 4: исполнители шагов — fixture (пометка FIXTURE, реальный прогон). Реальные
 // LLM-роли подключаются в этапе 5 заменой executor в этом конфиге — без правок кода очереди.
 
+import { FunnelStageSchema, PipelineStepSchema } from '../server/utils/schemas'
+import type { FunnelStage, PipelineStep } from '../server/utils/schemas'
+
+export { FunnelStageSchema, PipelineStepSchema }
+export type { FunnelStage, PipelineStep }
+
 export const PIPELINE_VERSION = 'v1-fixture'
 
 export type ExecutorKind = 'fixture' | (string & {})
-
-export type FunnelStage
-  = | 'draft'
-    | 'queued'
-    | 'research'
-    | 'critical_evaluation'
-    | 'decision'
-    | 'mvp_in_progress'
-    | 'mvp_ready'
-    | 'archived'
-
-export interface PipelineStep {
-  id: string
-  role: string
-  title: string
-  executor: ExecutorKind
-  timeoutMs: number
-  retries: number
-  /** Куда переводится funnel_stage идеи после успешного шага (TZ §3) */
-  funnelStageAfter?: FunnelStage
-}
 
 export const PIPELINE_STEPS: readonly PipelineStep[] = [
   {

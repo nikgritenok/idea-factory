@@ -1,7 +1,26 @@
+import { z } from 'zod'
 import { transcribeAudio, SttError } from '../utils/stt'
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024
 const MAX_DURATION_SEC = 600
+
+const TranscribeFormSchema = z.object({
+  audio: z.object({
+    data: z.instanceof(Buffer).refine(
+      buf => buf.length > 0,
+      'Нет файла аудио',
+    ).refine(
+      buf => buf.length <= MAX_AUDIO_BYTES,
+      'Аудио больше 25 МБ — запишите короче',
+    ),
+    type: z.string().default('audio/webm'),
+    filename: z.string().optional(),
+  }),
+  durationSec: z.coerce.number().int().positive().max(
+    MAX_DURATION_SEC,
+    'Запись длиннее 10 минут — запишите короче',
+  ).optional().default(0),
+})
 
 export default defineEventHandler(async (event) => {
   const form = await readMultipartFormData(event)
@@ -10,26 +29,14 @@ export default defineEventHandler(async (event) => {
   }
 
   const audioPart = form.find(p => p.name === 'audio')
-  if (!audioPart?.data?.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Нет файла аудио' })
-  }
+  const durationPart = form.find(p => p.name === 'durationSec')
 
-  if (audioPart.data.length > MAX_AUDIO_BYTES) {
-    throw createError({
-      statusCode: 413,
-      statusMessage: 'Аудио больше 25 МБ — запишите короче',
-    })
-  }
+  const parsed = TranscribeFormSchema.parse({
+    audio: audioPart ?? { data: Buffer.alloc(0), type: 'audio/webm' },
+    durationSec: durationPart?.data.toString() ?? '0',
+  })
 
-  const durationHeader = Number(form.find(p => p.name === 'durationSec')?.data.toString() ?? 0)
-  if (durationHeader > MAX_DURATION_SEC) {
-    throw createError({
-      statusCode: 413,
-      statusMessage: 'Запись длиннее 10 минут — запишите короче',
-    })
-  }
-
-  const mime = audioPart.type || 'audio/webm'
+  const mime = parsed.audio.type
   const ext = mime.includes('wav')
     ? 'wav'
     : mime.includes('mpeg')
@@ -40,14 +47,14 @@ export default defineEventHandler(async (event) => {
 
   try {
     const result = await transcribeAudio(
-      new Blob([new Uint8Array(audioPart.data)], { type: mime }),
+      new Blob([new Uint8Array(parsed.audio.data)], { type: mime }),
       `recording.${ext}`,
     )
 
     if (!result.text) {
       return {
         ok: false as const,
-        code: 'empty_transcript',
+        code: 'empty_transcript' as const,
         message: 'Речь не распознана. Попробуйте записать ещё раз или введите текст.',
       }
     }

@@ -1,9 +1,10 @@
 import { db } from '../../../utils/db'
 import { resumeJob, QueueControlError } from '../../../queue/controls'
+import { parseUuid } from '../../../utils/schemas'
 
 // POST /api/jobs/:id/resume — продолжение задачи с чекпоинта (TZ §8)
 export default defineEventHandler(async (event) => {
-  const jobId = getRouterParam(event, 'id') ?? ''
+  const jobId = parseUuid(getRouterParam(event, 'id'))
   const sql = db()
 
   try {

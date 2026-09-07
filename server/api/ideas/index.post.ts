@@ -1,24 +1,12 @@
 import { db } from '../../utils/db'
-import {
-  countActiveIdeas,
-  titleFromTranscript,
-  IDEA_LIMIT_ACTIVE,
-  type IdeaRow,
-} from '../../utils/ideas'
+import { countActiveIdeas, titleFromTranscript } from '../../utils/ideas'
+import { IDEA_LIMIT_ACTIVE, IdeaCreateSchema } from '../../utils/schemas'
 
 export default defineEventHandler(async (event) => {
   const sql = db()
 
-  const body = await readBody<{
-    transcript?: string
-    source_kind?: 'text' | 'voice'
-    priority?: 'high' | 'medium' | 'low'
-  }>(event)
-
-  const transcript = (body.transcript ?? '').trim()
-  if (!transcript) {
-    throw createError({ statusCode: 400, statusMessage: 'Текст идеи пуст' })
-  }
+  const body = await readBody(event)
+  const parsed = IdeaCreateSchema.parse(body)
 
   const activeCount = await countActiveIdeas(sql)
   if (activeCount >= IDEA_LIMIT_ACTIVE) {
@@ -28,14 +16,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const sourceKind = body.source_kind === 'voice' ? 'voice' : 'text'
-  const title = titleFromTranscript(transcript)
+  const title = titleFromTranscript(parsed.transcript)
 
   const rows = await sql`
     insert into ideas (title, source_transcript, source_kind, priority, funnel_stage, execution_status)
-    values (${title}, ${transcript}, ${sourceKind}, ${body.priority ?? 'medium'}, 'draft', 'paused')
+    values (${title}, ${parsed.transcript}, ${parsed.source_kind}, ${parsed.priority}, 'draft', 'paused')
     returning *`
-  const idea = rows[0] as IdeaRow
+  const idea = IdeaRowSchema.parse(rows[0])
 
   await sql`
     insert into idea_versions (idea_id, version, snapshot, changed_fields)

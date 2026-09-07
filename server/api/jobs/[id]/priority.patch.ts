@@ -1,20 +1,16 @@
 import { db } from '../../../utils/db'
 import { setJobPriority, QueueControlError } from '../../../queue/controls'
-import type { QueuePriority } from '../../../queue/types'
+import { parseUuid, PriorityBodySchema } from '../../../utils/schemas'
 
 // PATCH /api/jobs/:id/priority — смена приоритета задачи и идеи (TZ §8)
 export default defineEventHandler(async (event) => {
-  const jobId = getRouterParam(event, 'id') ?? ''
-  const body = await readBody<{ priority?: string }>(event).catch(() => ({}))
+  const jobId = parseUuid(getRouterParam(event, 'id'))
+  const body = await readBody(event).catch(() => ({}))
+  const parsed = PriorityBodySchema.parse(body)
   const sql = db()
 
-  const priority = body?.priority
-  if (priority !== 'high' && priority !== 'medium' && priority !== 'low') {
-    throw createError({ statusCode: 400, statusMessage: 'Приоритет должен быть high, medium или low' })
-  }
-
   try {
-    const job = await setJobPriority(sql, jobId, priority as QueuePriority)
+    const job = await setJobPriority(sql, jobId, parsed.priority as Priority)
     return { job }
   }
   catch (error) {

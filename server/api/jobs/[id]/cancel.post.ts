@@ -1,9 +1,10 @@
 import { db } from '../../../utils/db'
 import { cancelJob, QueueControlError } from '../../../queue/controls'
+import { parseUuid } from '../../../utils/schemas'
 
 // POST /api/jobs/:id/cancel — отмена задачи (TZ §8)
 export default defineEventHandler(async (event) => {
-  const jobId = getRouterParam(event, 'id') ?? ''
+  const jobId = parseUuid(getRouterParam(event, 'id'))
   const sql = db()
 
   try {

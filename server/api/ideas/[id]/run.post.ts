@@ -1,11 +1,12 @@
 import { db } from '../../../utils/db'
 import { enqueueIdeaAnalysis } from '../../../queue/enqueue'
 import { QueueControlError } from '../../../queue/controls'
+import { parseUuid } from '../../../utils/schemas'
 
 // POST /api/ideas/:id/run — запуск анализа идеи (TZ §8).
 // Идемпотентно: повторный клик возвращает существующую активную задачу, не создавая дубль.
 export default defineEventHandler(async (event) => {
-  const ideaId = getRouterParam(event, 'id') ?? ''
+  const ideaId = parseUuid(getRouterParam(event, 'id'))
   const sql = db()
 
   try {

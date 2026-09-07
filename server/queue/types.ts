@@ -1,39 +1,17 @@
-import type { PipelineStep, QueuePriority } from '../../config/pipeline'
 import type { Sql } from '../db/migrate'
+import { JobCheckpointSchema, JobRowSchema, PrioritySchema } from '../utils/schemas'
+import type { JobCheckpoint, JobRow, Priority } from '../utils/schemas'
 
-export { type PipelineStep, type QueuePriority } from '../../config/pipeline'
+export { JobCheckpointSchema, JobRowSchema, PrioritySchema }
+export type { JobCheckpoint, JobRow, Priority }
 
-/** Строка queue_jobs (TZ §8) */
-export interface JobRow {
-  id: string
-  idea_id: string
-  priority: QueuePriority
-  effective_priority: number
-  status: 'queued' | 'running' | 'paused' | 'done' | 'cancelled' | 'failed'
-  attempts: number
-  current_step: string | null
-  checkpoint: JobCheckpoint | null
-  idempotency_key: string | null
-  enqueued_at: Date
-  started_at: Date | null
-  finished_at: Date | null
-  error: string | null
-}
-
-/** Ссылка на состояние графа LangGraph + флаги, живёт в queue_jobs.checkpoint (jsonb) */
-export interface JobCheckpoint {
-  thread_id: string
-  graph_started: boolean
-  last_step: string | null
-  /** Повтор шага (TZ §8): откатиться к checkpoint перед этим шагом */
-  rewind_to_step: string | null
-}
+export type QueuePriority = Priority
 
 export interface StepContext {
   sql: Sql
   ideaId: string
   jobId: string
-  step: PipelineStep
+  step: { id: string }
   /** Результаты предыдущих шагов (state.stepResults) */
   state: Record<string, unknown>
   signal: AbortSignal

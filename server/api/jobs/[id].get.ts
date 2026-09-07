@@ -1,9 +1,9 @@
 import { db } from '../../utils/db'
-import type { JobRow } from '../../queue/types'
+import { parseUuid } from '../../utils/schemas'
 
 // GET /api/jobs/:id — статус задачи очереди (экран «Ход работы», TZ §7a)
 export default defineEventHandler(async (event) => {
-  const jobId = getRouterParam(event, 'id') ?? ''
+  const jobId = parseUuid(getRouterParam(event, 'id'))
   const sql = db()
 
   const [job] = await sql`
@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
   if (!job) {
     throw createError({ statusCode: 404, statusMessage: 'Задача не найдена' })
   }
+
   const jobRow = job as JobRow & { idea_title: string, funnel_stage: string, execution_status: string }
 
   return {
