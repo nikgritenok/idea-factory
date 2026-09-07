@@ -1,4 +1,4 @@
-# Coding Conventions — Vue 3 / Nuxt 3 (Nitro) / Node.js
+# Coding Conventions — Vue 3 / Nuxt 4 (Nitro) / Node.js
 
 These rules are mandatory for all agents and developers. For high-level agent behavior, see `AGENTS.md`.
 
@@ -26,7 +26,7 @@ These rules are mandatory for all agents and developers. For high-level agent be
 | Booleans                   | `is`/`has`/`can`/`should`      | `isLoading`, `hasError`          |
 | Event handlers             | `on` + Event                   | `onSubmit`, `onUpdate:modelValue`|
 
-## 3. Project Structure (Nuxt 3)
+## 3. Project Structure (Nuxt 4)
 
 ```
 app/                  # frontend (Vue)

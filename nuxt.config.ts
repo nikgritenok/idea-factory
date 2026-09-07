@@ -24,10 +24,24 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/css/tailwind.css'],
+
+  runtimeConfig: {
+    // server-only
+    openaiApiKey: '',
+    // public
+    public: {
+      appName: 'Фабрика идей',
+    },
+  },
   compatibilityDate: '2025-07-15',
 
   vite: {
     plugins: [tailwindcss()],
+  },
+
+  typescript: {
+    strict: true,
+    typeCheck: true,
   },
 
   eslint: {
