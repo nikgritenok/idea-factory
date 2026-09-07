@@ -1,5 +1,5 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
-import type { Sql } from '../db/migrate'
+import type { Sql } from '../db/types'
 import type { PipelineStep } from '../../config/pipeline'
 import { PIPELINE_VERSION } from '../../config/pipeline'
 import { claimNextJob, initialCheckpoint, type ClaimOptions } from './claim'

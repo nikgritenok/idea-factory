@@ -7,7 +7,8 @@
 | Framework | Nuxt 4.5 (Nitro) | Full-stack SSR/CSR, файловый роутинг, server routes |
 | Language | TypeScript | Строгая типизация, общая кодовая база |
 | ORM | postgres.js | Лёгкий SQL-first драйвер для PostgreSQL |
-| Database | PostgreSQL 16 | Основная реляционная БД (схема в `server/db/migrations/`) |
+| Database | PostgreSQL 16 | Основная реляционная БД |
+| Migrations | dbmate | SQL-миграции с rollback (файлы в `db/migrations/`) |
 | Validation | Zod | Валидация данных на границах (API, route params, env vars) |
 | AI/Orchestration | LangGraph.js 1.4 + PostgresSaver | StateGraph для пайплайна анализа, checkpointing в Postgres |
 | State | Pinia | Управление состоянием на клиенте |
@@ -34,7 +35,6 @@ server/               # Backend (Nitro)
   api/                # API-маршруты (auto-imported by Nitro)
     ideas/            # CRUD идей + запуск анализа
     jobs/             # Управление задачами очереди
-  db/                 # Миграции БД, CLI для миграций
   queue/              # Очередь задач + LangGraph-воркер
     checkpointer.ts   # PostgresSaver (LangGraph checkpointing)
     worker.ts         # AnalysisWorker — LangGraph StateGraph
@@ -52,6 +52,9 @@ server/               # Backend (Nitro)
     stt.ts            # STT через routerai.ru (для этапа 5+)
 
 config/               # Конфиги пайплайна (steps, лимиты, очереди)
+
+db/                   # SQL-миграции (dbmate)
+  migrations/         # Файлы миграций (up/down в одном файле)
 
 docs/                 # Документация
   ARCHITECTURE.md     # Этот файл

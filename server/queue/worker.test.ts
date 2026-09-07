@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import postgres from 'postgres'
-import { migrateUp } from '../db/migrate'
+import { applyMigrations } from '../db/helpers'
 import { enqueueIdeaAnalysis } from './enqueue'
 import { claimNextJob } from './claim'
 import { retryStep, resumeJob, cancelJob, pauseJob, setJobPriority, QueueControlError } from './controls'
@@ -146,7 +146,7 @@ function makeWorker(c: Counters, checkpointer: CheckpointerHandle, overrides?: R
 
 beforeAll(async () => {
   await sql.unsafe('drop schema public cascade; create schema public;')
-  await migrateUp(sql as unknown as never)
+  applyMigrations(DB)
   mainCheckpointer = createCheckpointer(DB)
   await ensureCheckpointerTables(mainCheckpointer)
 })

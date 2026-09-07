@@ -1,4 +1,4 @@
-import type { Sql } from '../db/migrate'
+import type { Sql } from '../db/types'
 import { JobCheckpointSchema, JobRowSchema, PrioritySchema } from '../utils/schemas'
 import type { JobCheckpoint, JobRow, Priority } from '../utils/schemas'
 

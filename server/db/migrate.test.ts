@@ -1,27 +1,33 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { migrateUp, migrateDown, appliedMigrations, getSql } from './migrate'
+import postgres from 'postgres'
 
-const DB = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5434/idea_factory_test'
+const DB = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5434/idea_factory_test?sslmode=disable'
 
-let sql = getSql(DB)
+let sql = postgres(DB)
 
 async function resetDb() {
   await sql.unsafe('drop schema public cascade; create schema public;')
 }
 
+async function applyMigrations() {
+  const { execFileSync } = await import('node:child_process')
+  execFileSync('dbmate', ['up'], {
+    env: { ...process.env, DATABASE_URL: DB },
+    timeout: 30_000,
+  })
+}
+
 beforeAll(async () => {
   await resetDb()
+  await applyMigrations()
 })
 
 afterAll(async () => {
   await sql.end()
 })
 
-describe('migrations', () => {
-  it('up применяет миграции и создаёт таблицы', async () => {
-    const applied = await migrateUp(sql)
-    expect(applied).toContain('0001_initial.up.sql')
-
+describe('database schema', () => {
+  it('создаёт все таблицы', async () => {
     const tables = await sql`
       select table_name from information_schema.tables
       where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -35,31 +41,6 @@ describe('migrations', () => {
       expect(names).toContain(t)
     }
   })
-
-  it('down откатывает миграции и удаляет таблицы', async () => {
-    const reverted = await migrateDown(sql, 1)
-    expect(reverted).toEqual(['0001_initial.up.sql'])
-    const tables = await sql`
-      select table_name from information_schema.tables
-      where table_schema = 'public' and table_type = 'BASE TABLE'`
-    const names = tables.map(t => t.table_name)
-    expect(names).not.toContain('ideas')
-    expect(names).not.toContain('queue_jobs')
-  })
-
-  it('up не применяет down-файлы как миграции', async () => {
-    // идёт после down-теста: up накатывает 0001, но down-файл в журнале не появляется
-    const applied = await migrateUp(sql)
-    expect(applied).toEqual(['0001_initial.up.sql'])
-    const journal = await appliedMigrations(sql)
-    expect(journal).toEqual(['0001_initial.up.sql'])
-  })
-
-  it('повторный up после down накатывает заново (idempotent по журналу)', async () => {
-    await migrateUp(sql)
-    const applied = await migrateUp(sql)
-    expect(applied).toEqual([])
-  })
 })
 
 describe('data durability', () => {
@@ -69,7 +50,7 @@ describe('data durability', () => {
       values ('Идея-переживает-рестарт', 'high', 'draft')`
 
     await sql.end()
-    sql = getSql(DB)
+    sql = postgres(DB)
 
     const rows = await sql`select title from ideas where title = 'Идея-переживает-рестарт'`
     expect(rows).toHaveLength(1)

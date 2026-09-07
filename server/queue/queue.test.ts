@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import postgres from 'postgres'
-import { migrateUp } from '../db/migrate'
+import { applyMigrations } from '../db/helpers'
 import { enqueueIdeaAnalysis } from './enqueue'
 import { claimNextJob } from './claim'
 
@@ -12,7 +12,7 @@ const sql = postgres(DB, { max: 5 })
 
 beforeAll(async () => {
   await sql.unsafe('drop schema public cascade; create schema public;')
-  await migrateUp(sql as unknown as never)
+  applyMigrations(DB)
 })
 
 // Изоляция тестов: leftover-задачи из предыдущих тестов ломают порядок claim

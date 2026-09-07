@@ -1,5 +1,5 @@
 import type { PipelineStep } from '../../config/pipeline'
-import type { Sql } from '../db/migrate'
+import type { Sql } from '../db/types'
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { QueueControlError } from './controls'
 import type { JobRow } from './types'

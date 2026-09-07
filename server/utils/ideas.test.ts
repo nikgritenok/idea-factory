@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import postgres from 'postgres'
 import { titleFromTranscript, countActiveIdeas, IDEA_LIMIT_ACTIVE } from './ideas'
-import { migrateUp } from '../db/migrate'
+import { applyMigrations } from '../db/helpers'
 
 const DB
   = process.env.TEST_DATABASE_URL
@@ -11,7 +11,7 @@ const sql = postgres(DB, { max: 5 })
 
 beforeAll(async () => {
   await sql.unsafe('drop schema public cascade; create schema public;')
-  await migrateUp(sql as unknown as never)
+  applyMigrations(DB)
 })
 
 describe('titleFromTranscript', () => {

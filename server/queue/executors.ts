@@ -1,4 +1,4 @@
-import type { Sql } from '../db/migrate'
+import type { Sql } from '../db/types'
 import type { ExecutorKind } from '../../config/pipeline'
 import type { StepExecutor } from './types'
 

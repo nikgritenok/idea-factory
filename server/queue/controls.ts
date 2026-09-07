@@ -1,4 +1,4 @@
-import type { Sql } from '../db/migrate'
+import type { Sql } from '../db/types'
 import { initialCheckpoint } from './claim'
 import type { JobCheckpoint, JobRow, QueuePriority } from './types'
 

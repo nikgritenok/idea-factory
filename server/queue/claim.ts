@@ -1,4 +1,4 @@
-import type { Sql } from '../db/migrate'
+import type { Sql } from '../db/types'
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { effectivePriority } from './priority'
 import type { JobCheckpoint, JobRow, QueuePriority } from './types'

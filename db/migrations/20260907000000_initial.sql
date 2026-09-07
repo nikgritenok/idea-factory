@@ -1,5 +1,7 @@
--- 0001_initial.up.sql — схема БД «Фабрики идей» (TZ §2, §6, §8, §9)
+-- 0001_initial — схема БД «Фабрики идей» (TZ §2, §6, §8, §9)
 -- Все времена — timestamptz (UTC). Идентификаторы — uuid.
+
+-- migrate:up
 
 -- Идеи (карточка идей TZ §2)
 create table ideas (
@@ -207,4 +209,17 @@ create table config_versions (
     unique (version)
 );
 
--- Метаданные миграций ведёт приложение (см. server/db/migrate.ts)
+-- migrate:down
+
+drop table if exists config_versions cascade;
+drop table if exists queue_jobs cascade;
+drop table if exists reports cascade;
+drop table if exists calculations cascade;
+drop table if exists datasets cascade;
+drop table if exists run_calls cascade;
+drop table if exists runs cascade;
+drop table if exists agent_outputs cascade;
+drop table if exists sources cascade;
+drop table if exists audio_files cascade;
+drop table if exists idea_versions cascade;
+drop table if exists ideas cascade;

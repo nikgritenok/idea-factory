@@ -16,6 +16,17 @@ docker run -d --name idea-factory-test-db \
 pnpm test
 ```
 
+## Миграции (dbmate)
+
+```bash
+pnpm run db:migrate   # применить все миграции
+pnpm run db:rollback  # откатить последнюю миграцию
+pnpm run db:status    # статус миграций
+pnpm run db:new       # создать новую миграцию
+```
+
+Миграции применяются автоматически при старте `web` (`RUN_MIGRATIONS=true`).
+
 ## Прод (docker-compose)
 
 ```bash
@@ -25,12 +36,3 @@ docker compose up -d --build
 
 Сервисы: `db` (postgres:16), `web` (Nuxt SSR, миграции применяются на старте),
 `worker` (persistent worker очереди), `validator` (микросервис-валидатор правил).
-
-Миграции применяются автоматически при старте `web` (`RUN_MIGRATIONS=true`).
-Ручное применение (читает `DATABASE_URL`):
-
-```bash
-DATABASE_URL=postgres://... pnpm run db:migrate
-DATABASE_URL=postgres://... pnpm run db:down
-DATABASE_URL=postgres://... pnpm run db:status
-```
