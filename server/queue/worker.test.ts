@@ -80,11 +80,11 @@ function barrierExec(
 }
 
 function openBarrier(): { promise: Promise<void>, release: () => void } {
-  let release!: () => void
-  const promise = new Promise<void>((r) => {
-    release = r
+  let releaseFn!: () => void
+  const promise = new Promise<void>((resolve) => {
+    releaseFn = resolve
   })
-  return { promise, release }
+  return { promise, release: releaseFn }
 }
 
 async function insertIdea(title: string): Promise<string> {

@@ -38,7 +38,7 @@ export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<J
           returning *`
         return claimed as JobRow
       }
-      return undefined
+      return
     }
 
     // 2. Очередь: расчёт эффективного приоритета с анти-голоданием (TZ §8)
@@ -70,7 +70,7 @@ export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<J
       }
     }
     if (!best) {
-      return undefined
+      return
     }
 
     // Условный переход queued→running: если задачу забрал параллельный воркер,

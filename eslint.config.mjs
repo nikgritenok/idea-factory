@@ -1,15 +1,136 @@
 // @ts-check
+import unicorn from 'eslint-plugin-unicorn'
 import withNuxt from './.nuxt/eslint.config.mjs'
 import vitest from '@vitest/eslint-plugin'
 import promise from 'eslint-plugin-promise'
+import slop from 'eslint-plugin-slop'
+import sonarjs from 'eslint-plugin-sonarjs'
 
 export default withNuxt(
   {
     ignores: ['.output/**', '.data/**', 'coverage/**', '**/*.generated.ts'],
   },
 
+  // @ts-expect-error eslint-plugin-promise types incompatible with flat config
   {
     plugins: { promise },
+  },
+
+  {
+    files: ['**/*.ts'],
+    plugins: { unicorn },
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+    rules: {
+      // === Anti-slop: защитный избыточный код ===
+      'unicorn/no-unnecessary-await': 'error',
+      'unicorn/no-useless-undefined': 'error',
+      'unicorn/no-useless-fallback-in-spread': 'error',
+      'unicorn/no-useless-length-check': 'error',
+      'unicorn/no-useless-spread': 'error',
+      'unicorn/no-useless-switch-case': 'error',
+      'unicorn/no-unnecessary-boolean-comparison': 'error',
+      'unicorn/no-impossible-length-comparison': 'error',
+      'unicorn/no-duplicate-if-branches': 'error',
+      'unicorn/no-constant-zero-expression': 'error',
+
+      // === Устаревшие API (автофиксы) ===
+      'unicorn/prefer-includes': 'error',
+      'unicorn/prefer-at': 'error',
+      'unicorn/prefer-string-slice': 'error',
+      'unicorn/prefer-string-starts-ends-with': 'error',
+      'unicorn/prefer-string-replace-all': 'error',
+      'unicorn/prefer-regexp-test': 'error',
+      'unicorn/no-typeof-undefined': 'error',
+      'unicorn/prefer-number-properties': 'error',
+      'unicorn/prefer-structured-clone': 'error',
+      'unicorn/prefer-group-by': 'error',
+      'unicorn/prefer-date-now': 'error',
+      'unicorn/prefer-modern-math-apis': 'error',
+      'unicorn/prefer-queue-microtask': 'error',
+      'unicorn/prefer-node-protocol': 'error',
+      'unicorn/no-new-buffer': 'error',
+
+      // === Async-slop ===
+      'unicorn/no-await-in-promise-methods': 'error',
+      'unicorn/no-single-promise-in-promise-methods': 'error',
+      'unicorn/no-async-promise-finally': 'error',
+      'unicorn/no-multiple-promise-resolver-calls': 'error',
+      'unicorn/prefer-promise-with-resolvers': 'error',
+      'unicorn/no-unsafe-promise-all-settled-values': 'error',
+
+      // === Структурный slop ===
+      'unicorn/no-nested-ternary': 'error',
+      'unicorn/consistent-function-scoping': 'error',
+      'unicorn/no-lonely-if': 'error',
+      'unicorn/prefer-early-return': 'error',
+
+      // === Против самого агента ===
+      'unicorn/no-abusive-eslint-disable': 'error',
+      'unicorn/expiring-todo-comments': 'error',
+      'unicorn/no-barrel-files': 'error',
+
+      // --- Отключённые opiniated (плодят disable-комментарии) ---
+      'unicorn/no-null': 'off',
+      'unicorn/no-negated-condition': 'off',
+      'unicorn/name-replacements': 'off',
+      'unicorn/single-line-block-comment-style': 'off',
+      'unicorn/template-indent': 'off',
+      'unicorn/prefer-export-from': 'off',
+      'unicorn/no-process-exit': 'off',
+      'unicorn/catch-error-name': 'off',
+      'unicorn/explicit-length-check': 'off',
+      'unicorn/custom-error-definition': 'off',
+      'unicorn/no-top-level-side-effects': 'off',
+      'unicorn/no-immediate-mutation': 'off',
+      'unicorn/no-top-level-assignment-in-function': 'off',
+    },
+  },
+
+  {
+    files: ['**/*.ts'],
+    plugins: { slop },
+    rules: {
+      'slop/no-trivial-functions': 'error',
+      'slop/no-trivial-type-aliases': 'error',
+      'slop/no-chained-type-assertions': 'error',
+      'slop/no-static-only-class': 'error',
+    },
+  },
+
+  {
+    files: ['**/*.ts'],
+    plugins: { sonarjs },
+    rules: {
+      // Дублирование и избыточный код
+      'sonarjs/no-duplicate-string': 'error',
+      'sonarjs/no-identical-functions': 'error',
+      'sonarjs/no-duplicated-branches': 'error',
+      'sonarjs/no-identical-conditions': 'error',
+      'sonarjs/no-redundant-boolean': 'error',
+      'sonarjs/no-redundant-parentheses': 'error',
+      'sonarjs/no-redundant-jump': 'error',
+      'sonarjs/no-redundant-assignments': 'error',
+      'sonarjs/no-collapsible-if': 'error',
+      'sonarjs/no-useless-increment': 'error',
+      'sonarjs/no-dead-store': 'error',
+      'sonarjs/no-empty-collection': 'error',
+      'sonarjs/no-same-line-conditional': 'error',
+
+      // Структура
+      'sonarjs/prefer-single-boolean-return': 'error',
+      'sonarjs/prefer-immediate-return': 'error',
+      'sonarjs/no-nested-switch': 'error',
+      'sonarjs/no-nested-conditional': 'error',
+      'sonarjs/cognitive-complexity': ['error', 20],
+
+      // Промисы и async
+      'sonarjs/no-try-promise': 'error',
+      'sonarjs/prefer-promise-shorthand': 'error',
+
+      // Отключённые:too noisy / не релевантны
+      'sonarjs/no-commented-code': 'off',
+      'sonarjs/no-unused-function-argument': 'off',
+    },
   },
 
   {
@@ -129,6 +250,7 @@ export default withNuxt(
     rules: {
       'no-console': 'off',
       'no-restricted-properties': 'off',
+      'unicorn/expiring-todo-comments': 'off',
     },
   },
 
@@ -154,6 +276,9 @@ export default withNuxt(
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       'no-promise-executor-return': 'off',
+      'unicorn/prefer-promise-with-resolvers': 'off',
+      'slop/no-chained-type-assertions': 'off',
+      'sonarjs/no-duplicate-string': 'off',
     },
   },
 )

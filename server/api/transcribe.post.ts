@@ -37,13 +37,16 @@ export default defineEventHandler(async (event) => {
   })
 
   const mime = parsed.audio.type
-  const ext = mime.includes('wav')
-    ? 'wav'
-    : mime.includes('mpeg')
-      ? 'mp3'
-      : mime.includes('ogg')
-        ? 'ogg'
-        : 'webm'
+  let ext = 'webm'
+  if (mime.includes('wav')) {
+    ext = 'wav'
+  }
+  else if (mime.includes('mpeg')) {
+    ext = 'mp3'
+  }
+  else if (mime.includes('ogg')) {
+    ext = 'ogg'
+  }
 
   try {
     const result = await transcribeAudio(

@@ -235,7 +235,7 @@ export class AnalysisWorker {
       return 'failed'
     }
 
-    const lastStep = this.opts.steps[this.opts.steps.length - 1]?.id ?? null
+    const lastStep = this.opts.steps.at(-1)?.id ?? null
     await this.sql`
       update queue_jobs
       set status = 'done', finished_at = now(), checkpoint = ${this.sql.json({ ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint)}
@@ -259,7 +259,7 @@ export class AnalysisWorker {
     for (let i = 0; i < stepIds.length - 1; i++) {
       builder.addEdge(stepIds[i] as string, stepIds[i + 1] as string)
     }
-    builder.addEdge(stepIds[stepIds.length - 1] as string, END)
+    builder.addEdge(stepIds.at(-1) as string, END)
     return builder.compile({ checkpointer: this.opts.checkpointer.checkpointer })
   }
 
