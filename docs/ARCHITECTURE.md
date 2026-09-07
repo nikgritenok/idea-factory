@@ -12,7 +12,7 @@
 | AI/Orchestration | LangGraph.js 1.4 + PostgresSaver | StateGraph для пайплайна анализа, checkpointing в Postgres |
 | State | Pinia | Управление состоянием на клиенте |
 | Build | Vite 8 | Сборка клиентской части |
-| Package manager | npm | Управление зависимостями |
+| Package manager | pnpm | Управление зависимостями |
 | Linting | ESLint + @nuxt/eslint + stylistic | Статический анализ кода |
 | Testing | Vitest | Unit-тесты, интеграционные тесты |
 | Runtime | Node.js (LTS) | Серверный рантайм |
@@ -78,7 +78,7 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 - **Управление**: пауза/продолжение/отмена/повтор шага/смена приоритета — через API (`/api/jobs/:id/*`)
 - **Режимы запуска**: 
   - `WORKER_MODE=true` — Nitro-плагин запускает воркер в фоне (docker-compose worker service)
-  - `npm run worker` — standalone CLI (`worker-cli.ts`)
+  - `pnpm run worker` — standalone CLI (`worker-cli.ts`)
 - **Executor Registry**: плагинная архитектура исполнителей шагов (`registerExecutor`), fixture-реализация для прототипа, реальные ИИ-вызовы подключаются на этапе 5
 
 ### Проверенные сценарии (автотесты + ручная проверка)

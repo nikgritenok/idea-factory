@@ -3,8 +3,8 @@
 ## Локальная разработка
 
 ```bash
-npm install
-npm run dev          # Nuxt на http://localhost:3000
+pnpm install
+pnpm run dev          # Nuxt на http://localhost:3000
 ```
 
 Тестовая БД (для автотестов):
@@ -13,7 +13,7 @@ npm run dev          # Nuxt на http://localhost:3000
 docker run -d --name idea-factory-test-db \
   -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=idea_factory_test \
   -p 5434:5432 postgres:16-alpine
-npx vitest run
+pnpm test
 ```
 
 ## Прод (docker-compose)
@@ -30,7 +30,7 @@ docker compose up -d --build
 Ручное применение (читает `DATABASE_URL`):
 
 ```bash
-DATABASE_URL=postgres://... npx tsx server/db/migrate-cli.ts up
-DATABASE_URL=postgres://... npx tsx server/db/migrate-cli.ts down   # откат последней
-DATABASE_URL=postgres://... npx tsx server/db/migrate-cli.ts status
+DATABASE_URL=postgres://... pnpm run db:migrate
+DATABASE_URL=postgres://... pnpm run db:down
+DATABASE_URL=postgres://... pnpm run db:status
 ```

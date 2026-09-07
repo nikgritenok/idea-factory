@@ -5,7 +5,7 @@ import { AnalysisWorker } from './worker'
 
 /**
  * CLI постоянного воркера (TZ §8): один обработчик, продолжающий очередь.
- * Использование: npm run worker (DATABASE_URL из окружения, см. .env.example).
+ * Использование: pnpm run worker (DATABASE_URL из окружения, см. .env.example).
  */
 async function main(): Promise<void> {
   await ensureMigrated()
