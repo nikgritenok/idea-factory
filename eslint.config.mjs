@@ -200,7 +200,7 @@ export default withNuxt(
       '@typescript-eslint/no-unnecessary-type-arguments': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
-      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
+      '@typescript-eslint/return-await': ['error', 'always'],
       '@typescript-eslint/no-confusing-void-expression': 'error',
       '@typescript-eslint/no-meaningless-void-operator': 'error',
       '@typescript-eslint/only-throw-error': 'error',

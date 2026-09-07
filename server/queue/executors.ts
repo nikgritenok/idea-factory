@@ -29,7 +29,7 @@ registry.set('fixture', async (ctx) => {
 })
 
 async function delay(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     const t = setTimeout(resolve, ms)
     signal.addEventListener(
       'abort',

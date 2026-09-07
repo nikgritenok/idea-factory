@@ -53,11 +53,12 @@ export class AnalysisWorker {
   /** Запускает цикл обработки; возвращает промис, который резолвится после stop() */
   async start(): Promise<void> {
     if (this.looping) {
-      return this.looping
+      await this.looping
+      return
     }
     this.stopped = false
     this.looping = this.loop()
-    return this.looping
+    await this.looping
   }
 
   /** Останавливает приём новых задач; текущая задача завершается до конца шага-цикла */
@@ -116,7 +117,7 @@ export class AnalysisWorker {
       const target = await findCheckpointBefore(graph, cp.thread_id, cp.rewind_to_step)
       await this.clearRewind(job.id, cp)
       if (target) {
-        return this.replayFromCheckpoint(job, graph, target)
+        return await this.replayFromCheckpoint(job, graph, target)
       }
     }
 
@@ -129,7 +130,7 @@ export class AnalysisWorker {
           pipelineVersion: PIPELINE_VERSION,
           stepResults: {},
         }
-    return this.streamJob(job, graph, { ...config }, streamInput)
+    return await this.streamJob(job, graph, { ...config }, streamInput)
   }
 
   /** Обычное исполнение/возобновление: поток событий шаг за шагом, пауза/отмена на границах */
@@ -266,7 +267,7 @@ export class AnalysisWorker {
   private makeNode(step: PipelineStep, exec: StepExecutor) {
     return async (state: PipelineStateT): Promise<Pick<PipelineStateT, 'stepResults'>> => {
       const output = await runWithRetry(
-        async () => exec({
+        async () => await exec({
           sql: this.sql,
           ideaId: state.ideaId,
           jobId: state.jobId,

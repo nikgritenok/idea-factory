@@ -23,7 +23,7 @@ export interface ClaimOptions {
  * условный UPDATE (атомарно, без блокировки всего набора кандидатов).
  */
 export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<JobRow | undefined> {
-  return sql.begin(async (tx) => {
+  return await sql.begin(async (tx) => {
     // 1. Восстановление (только при старте воркера)
     if (opts.resumeRunning) {
       const [interrupted] = await tx`

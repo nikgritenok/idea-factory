@@ -55,7 +55,7 @@ async function insertJob(sql: Sql, ideaId: string, priority: string, key: string
 
   // Ключ занят: активная задача → идемпотентный возврат (гонка параллельных кликов),
   // завершённая → освобождаем ключ (версионируем) и вставляем заново
-  return sql.begin(async (tx) => {
+  return await sql.begin(async (tx) => {
     const [old] = await tx`
       select * from queue_jobs where idempotency_key = ${key} limit 1`
     if (old) {

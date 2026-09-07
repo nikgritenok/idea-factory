@@ -23,7 +23,7 @@ export async function runWithRetry(
 }
 
 export async function withTimeout(p: Promise<{ output: unknown }>, timeoutMs: number): Promise<{ output: unknown }> {
-  return Promise.race([
+  return await Promise.race([
     p,
     new Promise<never>((_, reject) => {
       setTimeout(() => {
@@ -34,7 +34,7 @@ export async function withTimeout(p: Promise<{ output: unknown }>, timeoutMs: nu
 }
 
 export async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
+  await new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
