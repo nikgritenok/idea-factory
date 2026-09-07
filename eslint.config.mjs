@@ -14,6 +14,12 @@ export default withNuxt(
   // @ts-expect-error eslint-plugin-promise types incompatible with flat config
   {
     plugins: { promise },
+    rules: {
+      'promise/prefer-await-to-then': 'error',
+      'promise/prefer-await-to-callbacks': 'error',
+      'promise/no-nesting': 'error',
+      'promise/no-return-wrap': 'error',
+    },
   },
 
   {
@@ -69,6 +75,18 @@ export default withNuxt(
       'unicorn/expiring-todo-comments': 'error',
       'unicorn/no-barrel-files': 'error',
 
+      // === Массивы и коллекции ===
+      'unicorn/prefer-array-find': 'error',
+      'unicorn/prefer-array-flat-map': 'error',
+      'unicorn/prefer-array-some': 'error',
+      'unicorn/prefer-set-has': 'error',
+      'unicorn/prefer-native-coercion-functions': 'error',
+      'unicorn/prefer-string-raw': 'error',
+
+      // === Тернари и операторы ===
+      'unicorn/prefer-ternary': 'error',
+      'unicorn/prefer-logical-operator-over-ternary': 'error',
+
       // --- Отключённые opiniated (плодят disable-комментарии) ---
       'unicorn/no-null': 'off',
       'unicorn/no-negated-condition': 'off',
@@ -122,6 +140,13 @@ export default withNuxt(
       'sonarjs/no-nested-switch': 'error',
       'sonarjs/no-nested-conditional': 'error',
       'sonarjs/cognitive-complexity': ['error', 20],
+      'sonarjs/no-element-overwrite': 'error',
+      'sonarjs/no-extra-arguments': 'error',
+      'sonarjs/no-gratuitous-expressions': 'error',
+      'sonarjs/no-inverted-boolean-check': 'error',
+      'sonarjs/no-small-switch': 'error',
+      'sonarjs/prefer-object-literal': 'error',
+      'sonarjs/prefer-while': 'error',
 
       // Промисы и async
       'sonarjs/no-try-promise': 'error',
@@ -167,6 +192,20 @@ export default withNuxt(
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
       }],
+
+      // === Type-aware: качество типов ===
+      '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+      '@typescript-eslint/no-import-type-side-effects': 'error',
+      '@typescript-eslint/no-redundant-type-constituents': 'error',
+      '@typescript-eslint/no-unnecessary-type-arguments': 'error',
+      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'error',
+      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
+      '@typescript-eslint/no-confusing-void-expression': 'error',
+      '@typescript-eslint/no-meaningless-void-operator': 'error',
+      '@typescript-eslint/only-throw-error': 'error',
+      '@typescript-eslint/require-array-sort-compare': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
     },
   },
 
@@ -190,6 +229,10 @@ export default withNuxt(
       'vue/no-v-html': 'error',
       'vue/component-name-in-template-casing': ['error', 'PascalCase'],
       'vue/prefer-true-attribute-shorthand': 'error',
+      'vue/block-order': ['error', { order: ['script', 'template', 'style'] }],
+      'vue/define-macros-order': ['error', { order: ['defineProps', 'defineEmits'] }],
+      'vue/no-ref-as-operand': 'error',
+      'vue/no-setup-props-reactivity-loss': 'error',
     },
   },
 
@@ -198,8 +241,14 @@ export default withNuxt(
     ignores: ['**/*.test.ts', 'server/queue/worker-cli.ts', 'config/**/*.ts'],
     rules: {
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 100, skipBlankLines: true, skipComments: true }],
       'max-params': ['error', { max: 4 }],
+    },
+  },
+  {
+    files: ['server/**/*.ts'],
+    rules: {
+      'max-lines-per-function': ['error', { max: 120, skipBlankLines: true, skipComments: true }],
     },
   },
   {

@@ -24,7 +24,7 @@ const TranscribeFormSchema = z.object({
 
 export default defineEventHandler(async (event) => {
   const form = await readMultipartFormData(event)
-  if (!form || !form.length) {
+  if (!form?.length) {
     throw createError({ statusCode: 400, statusMessage: 'Нет файла аудио' })
   }
 

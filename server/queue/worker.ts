@@ -51,7 +51,7 @@ export class AnalysisWorker {
   }
 
   /** Запускает цикл обработки; возвращает промис, который резолвится после stop() */
-  start(): Promise<void> {
+  async start(): Promise<void> {
     if (this.looping) {
       return this.looping
     }
@@ -266,7 +266,7 @@ export class AnalysisWorker {
   private makeNode(step: PipelineStep, exec: StepExecutor) {
     return async (state: PipelineStateT): Promise<Pick<PipelineStateT, 'stepResults'>> => {
       const output = await runWithRetry(
-        () => exec({
+        async () => exec({
           sql: this.sql,
           ideaId: state.ideaId,
           jobId: state.jobId,

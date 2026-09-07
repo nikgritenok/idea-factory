@@ -61,9 +61,12 @@ function barrierExec(
     if (hold.promise) {
       const { signal } = ctx
       await new Promise<void>((resolve, reject) => {
-        const onAbort = () => reject(new Error('aborted'))
+        const onAbort = () => {
+          reject(new Error('aborted'))
+        }
         if (signal.aborted) {
-          return onAbort()
+          onAbort()
+          return
         }
         signal.addEventListener('abort', onAbort, { once: true })
         hold.promise!.then(
@@ -87,8 +90,10 @@ function openBarrier(): { promise: Promise<void>, release: () => void } {
   return { promise, release: releaseFn }
 }
 
-async function insertIdea(title: string): Promise<string> {
-  const [row] = await sql`insert into ideas (title) values (${title}) returning id`
+async function insertIdea(title: string, priority?: string): Promise<string> {
+  const [row] = priority
+    ? await sql`insert into ideas (title, priority) values (${title}, ${priority}) returning id`
+    : await sql`insert into ideas (title) values (${title}) returning id`
   return (row as { id: string }).id
 }
 

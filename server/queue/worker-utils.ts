@@ -22,26 +22,18 @@ export async function runWithRetry(
     : lastError
 }
 
-export function withTimeout(p: Promise<{ output: unknown }>, timeoutMs: number): Promise<{ output: unknown }> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(
-      () => reject(new Error(`Таймаут шага ${timeoutMs} мс`)),
-      timeoutMs,
-    )
-    p.then(
-      (v) => {
-        clearTimeout(t)
-        resolve(v)
-      },
-      (e) => {
-        clearTimeout(t)
-        reject(e)
-      },
-    )
-  })
+export async function withTimeout(p: Promise<{ output: unknown }>, timeoutMs: number): Promise<{ output: unknown }> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Таймаут шага ${timeoutMs} мс`))
+      }, timeoutMs)
+    }),
+  ])
 }
 
-export function sleep(ms: number): Promise<void> {
+export async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })

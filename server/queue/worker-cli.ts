@@ -29,6 +29,7 @@ async function main(): Promise<void> {
   console.log('[worker] запущен, жду задачи из очереди (Ctrl+C — остановка)')
 }
 
+// eslint-disable-next-line promise/prefer-await-to-callbacks
 main().catch((error) => {
   console.error('[worker] не удалось запуститься:', error)
   process.exit(1)
