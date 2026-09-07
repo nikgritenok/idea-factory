@@ -1,30 +1,38 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import tailwindcss from "@tailwindcss/vite";
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-    compatibilityDate: "2025-07-15",
-    devtools: { enabled: true },
 
-    css: ["~/assets/css/tailwind.css"],
+  modules: ['@nuxt/eslint'],
+  devtools: { enabled: true },
 
-    vite: {
-        plugins: [tailwindcss()],
-    },
-
-    app: {
-        head: {
-            link: [
-                { rel: "preconnect", href: "https://fonts.googleapis.com" },
-                {
-                    rel: "preconnect",
-                    href: "https://fonts.gstatic.com",
-                    crossorigin: "",
-                },
-                {
-                    rel: "stylesheet",
-                    href: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap",
-                },
-            ],
+  app: {
+    head: {
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        {
+          rel: 'preconnect',
+          href: 'https://fonts.gstatic.com',
+          crossorigin: '',
         },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap',
+        },
+      ],
     },
-});
+  },
+
+  css: ['~/assets/css/tailwind.css'],
+  compatibilityDate: '2025-07-15',
+
+  vite: {
+    plugins: [tailwindcss()],
+  },
+
+  eslint: {
+    config: {
+      stylistic: true,
+    },
+  },
+})
