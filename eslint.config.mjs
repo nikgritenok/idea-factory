@@ -1,10 +1,15 @@
 // @ts-check
 import withNuxt from './.nuxt/eslint.config.mjs'
 import vitest from '@vitest/eslint-plugin'
+import promise from 'eslint-plugin-promise'
 
 export default withNuxt(
   {
     ignores: ['.output/**', '.data/**', 'coverage/**', '**/*.generated.ts'],
+  },
+
+  {
+    plugins: { promise },
   },
 
   {
@@ -49,6 +54,7 @@ export default withNuxt(
     rules: {
       'no-async-promise-executor': 'error',
       'no-promise-executor-return': 'error',
+      'promise/no-multiple-resolved': 'error',
       'eqeqeq': ['error', 'always'],
       'no-eval': 'error',
       'no-new-func': 'error',
