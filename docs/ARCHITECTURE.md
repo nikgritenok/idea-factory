@@ -8,7 +8,7 @@
 | Language | TypeScript | Строгая типизация, общая кодовая база |
 | ORM | postgres.js | Лёгкий SQL-first драйвер для PostgreSQL |
 | Database | PostgreSQL 16 | Основная реляционная БД (схема в `server/db/migrations/`) |
-| Validation | ручная валидация | `createError` на границах API (zone-style) |
+| Validation | Zod | Валидация данных на границах (API, route params, env vars) |
 | AI/Orchestration | LangGraph.js 1.4 + PostgresSaver | StateGraph для пайплайна анализа, checkpointing в Postgres |
 | State | Pinia | Управление состоянием на клиенте |
 | Build | Vite 8 | Сборка клиентской части |
