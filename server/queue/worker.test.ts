@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import postgres from 'postgres'
-import { applyMigrations } from '../db/helpers'
-import { enqueueIdeaAnalysis } from './enqueue'
-import { claimNextJob } from './claim'
-import { retryStep, resumeJob, cancelJob, pauseJob, setJobPriority, QueueControlError } from './controls'
-import { createCheckpointer, ensureCheckpointerTables, type CheckpointerHandle } from './checkpointer'
-import { AnalysisWorker } from './worker'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
 import type { JobRow, StepExecutor } from './types'
+
+import { applyMigrations } from '../db/helpers'
+import { type CheckpointerHandle, createCheckpointer, ensureCheckpointerTables } from './checkpointer'
+import { claimNextJob } from './claim'
+import { cancelJob, pauseJob, QueueControlError, resumeJob, retryStep, setJobPriority } from './controls'
+import { enqueueIdeaAnalysis } from './enqueue'
+import { AnalysisWorker } from './worker'
 
 const DB
   = process.env.TEST_DATABASE_URL
@@ -18,16 +20,16 @@ let mainCheckpointer: CheckpointerHandle
 
 /** Тестовый пайплайн: 3 шага, s2 с retries, funnel после s3 */
 const steps = [
-  { id: 's1', role: 'r1', title: 's1', executor: 't1', timeoutMs: 3000, retries: 0 },
-  { id: 's2', role: 'r2', title: 's2', executor: 't2', timeoutMs: 3000, retries: 1 },
+  { executor: 't1', id: 's1', retries: 0, role: 'r1', timeoutMs: 3000, title: 's1' },
+  { executor: 't2', id: 's2', retries: 1, role: 'r2', timeoutMs: 3000, title: 's2' },
   {
-    id: 's3',
-    role: 'r3',
-    title: 's3',
     executor: 't3',
-    timeoutMs: 3000,
-    retries: 0,
     funnelStageAfter: 'decision' as const,
+    id: 's3',
+    retries: 0,
+    role: 'r3',
+    timeoutMs: 3000,
+    title: 's3',
   },
 ]
 
@@ -38,6 +40,7 @@ function counters(): Counters {
 }
 
 function countingExecutors(c: Counters, overrides: Record<string, StepExecutor> = {}): Record<string, StepExecutor> {
+  // eslint-disable-next-line ai-guard/no-async-without-await -- return type requires async
   const count = (id: keyof Counters): StepExecutor => async () => {
     c[id]++
     return { output: { done: id } }
@@ -142,10 +145,10 @@ async function waitForStep(jobId: string, stepId: string, timeoutMs = 5000): Pro
 
 function makeWorker(c: Counters, checkpointer: CheckpointerHandle, overrides?: Record<string, StepExecutor>): AnalysisWorker {
   return new AnalysisWorker(sql, {
-    steps,
     checkpointer,
     executors: countingExecutors(c, overrides),
     retryDelayMs: 20,
+    steps,
   })
 }
 
@@ -199,16 +202,16 @@ describe('рестарт воркера продолжает с последне
     // Воркер A выполняет s1, s2 и зависает на s3 — процесс «умирает» (промис брошен)
     let s3Started = false
     const crashBarrier: Parameters<typeof barrierExec>[0] = {
-      promise: new Promise<void>(() => {}),
       onStarted: () => {
         s3Started = true
       },
+      promise: new Promise<void>(() => {}),
     }
     const workerA = new AnalysisWorker(sql, {
-      steps,
       checkpointer: crashCheckpointer,
       executors: countingExecutors(cA, { t3: barrierExec(crashBarrier, 'A-s3') }),
       retryDelayMs: 20,
+      steps,
     })
 
     const ideaId = await insertIdea('worker-рестарт')
@@ -313,6 +316,7 @@ describe('сбой шага с повторами (этап 5: таймауты/
     const c = counters()
     let s2Calls = 0
     const worker = makeWorker(c, mainCheckpointer, {
+      // eslint-disable-next-line ai-guard/no-async-without-await -- return type requires async
       t2: async () => {
         s2Calls++
         throw new Error('модель недоступна')

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { transcribeAudio, SttError } from './stt'
+import { describe, expect, it } from 'vitest'
+
+import { SttError, transcribeAudio } from './stt'
 
 describe('transcribeAudio — контракт routerai STT', () => {
   it('без ключа throws SttError 503 (не падает молча)', async () => {

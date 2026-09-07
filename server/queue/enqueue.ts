@@ -1,8 +1,9 @@
 import type { PipelineStep } from '../../config/pipeline'
 import type { Sql } from '../db/types'
+import type { JobRow } from './types'
+
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { QueueControlError } from './controls'
-import type { JobRow } from './types'
 
 /**
  * Постановка идеи в очередь анализа (TZ §8).
@@ -31,11 +32,11 @@ export async function enqueueIdeaAnalysis(
     where idea_id = ${ideaId} and status in ('queued', 'running', 'paused')
     order by enqueued_at desc limit 1`
   if (existing) {
-    return { job: existing as JobRow, created: false }
+    return { created: false, job: existing as JobRow }
   }
 
   const inserted = await insertJob(sql, ideaId, String(idea.priority), key)
-  return { job: inserted, created: true }
+  return { created: true, job: inserted }
 }
 
 async function insertJob(sql: Sql, ideaId: string, priority: string, key: string): Promise<JobRow> {

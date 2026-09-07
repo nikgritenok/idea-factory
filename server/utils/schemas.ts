@@ -43,27 +43,27 @@ export type JobStatus = z.infer<typeof JobStatusSchema>
 // ─── Idea ────────────────────────────────────────────────────────────────────
 
 export const IdeaCreateSchema = z.object({
-  transcript: z.string().trim().min(1, 'Текст идеи пуст'),
-  source_kind: SourceKindSchema.default('text'),
   priority: PrioritySchema.default('medium'),
+  source_kind: SourceKindSchema.default('text'),
+  transcript: z.string().trim().min(1, 'Текст идеи пуст'),
 })
 
 export const IdeaRowSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string(),
-  source_transcript: z.string().nullable(),
-  source_kind: SourceKindSchema,
-  structured_idea: z.unknown().nullable(),
-  problem: z.string().nullable(),
-  audience: z.string().nullable(),
-  value: z.string().nullable(),
-  constraints: z.unknown().nullable(),
   assumptions: z.unknown().nullable(),
-  priority: PrioritySchema,
-  funnel_stage: FunnelStageSchema,
-  execution_status: ExecutionStatusSchema,
+  audience: z.string().nullable(),
+  constraints: z.unknown().nullable(),
   created_at: z.coerce.date(),
+  execution_status: ExecutionStatusSchema,
+  funnel_stage: FunnelStageSchema,
+  id: z.string().uuid(),
+  priority: PrioritySchema,
+  problem: z.string().nullable(),
+  source_kind: SourceKindSchema,
+  source_transcript: z.string().nullable(),
+  structured_idea: z.unknown().nullable(),
+  title: z.string(),
   updated_at: z.coerce.date(),
+  value: z.string().nullable(),
   version: z.number().int().nonnegative(),
 })
 export type IdeaRow = z.infer<typeof IdeaRowSchema>
@@ -71,27 +71,27 @@ export type IdeaRow = z.infer<typeof IdeaRowSchema>
 // ─── Job ─────────────────────────────────────────────────────────────────────
 
 export const JobCheckpointSchema = z.object({
-  thread_id: z.string().uuid(),
   graph_started: z.boolean(),
   last_step: z.string().nullable(),
   rewind_to_step: z.string().nullable(),
+  thread_id: z.string().uuid(),
 })
 export type JobCheckpoint = z.infer<typeof JobCheckpointSchema>
 
 export const JobRowSchema = z.object({
+  attempts: z.number().int().nonnegative(),
+  checkpoint: JobCheckpointSchema.nullable(),
+  current_step: z.string().nullable(),
+  effective_priority: z.number().int(),
+  enqueued_at: z.coerce.date(),
+  error: z.string().nullable(),
+  finished_at: z.coerce.date().nullable(),
   id: z.string().uuid(),
   idea_id: z.string().uuid(),
-  priority: PrioritySchema,
-  effective_priority: z.number().int(),
-  status: JobStatusSchema,
-  attempts: z.number().int().nonnegative(),
-  current_step: z.string().nullable(),
-  checkpoint: JobCheckpointSchema.nullable(),
   idempotency_key: z.string().nullable(),
-  enqueued_at: z.coerce.date(),
+  priority: PrioritySchema,
   started_at: z.coerce.date().nullable(),
-  finished_at: z.coerce.date().nullable(),
-  error: z.string().nullable(),
+  status: JobStatusSchema,
 })
 export type JobRow = z.infer<typeof JobRowSchema>
 
@@ -110,55 +110,55 @@ export const PriorityBodySchema = z.object({
 export const ExecutorKindSchema = z.union([z.literal('fixture'), z.string()])
 
 export const PipelineStepSchema = z.object({
-  id: z.string(),
-  role: z.string(),
-  title: z.string(),
   executor: ExecutorKindSchema,
-  timeoutMs: z.number().int().positive(),
-  retries: z.number().int().nonnegative(),
   funnelStageAfter: FunnelStageSchema.optional(),
+  id: z.string(),
+  retries: z.number().int().nonnegative(),
+  role: z.string(),
+  timeoutMs: z.number().int().positive(),
+  title: z.string(),
 })
 export type PipelineStep = z.infer<typeof PipelineStepSchema>
 
 // ─── API responses ───────────────────────────────────────────────────────────
 
 export const JobResponseSchema = z.object({
-  job: z.object({
+  idea: z.object({
+    execution_status: ExecutionStatusSchema,
+    funnel_stage: FunnelStageSchema,
     id: z.string().uuid(),
-    idea_id: z.string().uuid(),
-    priority: PrioritySchema,
-    status: JobStatusSchema,
+    title: z.string(),
+  }),
+  job: z.object({
     attempts: z.number().int().nonnegative(),
     current_step: z.string().nullable(),
     enqueued_at: z.coerce.date(),
-    started_at: z.coerce.date().nullable(),
-    finished_at: z.coerce.date().nullable(),
     error: z.string().nullable(),
-  }),
-  idea: z.object({
+    finished_at: z.coerce.date().nullable(),
     id: z.string().uuid(),
-    title: z.string(),
-    funnel_stage: FunnelStageSchema,
-    execution_status: ExecutionStatusSchema,
+    idea_id: z.string().uuid(),
+    priority: PrioritySchema,
+    started_at: z.coerce.date().nullable(),
+    status: JobStatusSchema,
   }),
 })
 
 export const EnqueueResponseSchema = z.object({
-  job: JobRowSchema,
   created: z.boolean(),
+  job: JobRowSchema,
 })
 
 export const TranscribeSuccessSchema = z.object({
+  cost: z.number(),
+  durationSec: z.number(),
   ok: z.literal(true),
   text: z.string(),
-  durationSec: z.number(),
-  cost: z.number(),
 })
 
 export const TranscribeEmptySchema = z.object({
-  ok: z.literal(false),
   code: z.literal('empty_transcript'),
   message: z.string(),
+  ok: z.literal(false),
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

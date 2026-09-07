@@ -1,5 +1,5 @@
+import { QueueControlError, setJobPriority } from '../../../queue/controls'
 import { db } from '../../../utils/db'
-import { setJobPriority, QueueControlError } from '../../../queue/controls'
 import { parseUuid, PriorityBodySchema } from '../../../utils/schemas'
 
 // PATCH /api/jobs/:id/priority — смена приоритета задачи и идеи (TZ §8)

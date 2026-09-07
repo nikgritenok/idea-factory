@@ -1,11 +1,13 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
-import type { Sql } from '../db/types'
+
 import type { PipelineStep } from '../../config/pipeline'
-import { PIPELINE_VERSION } from '../../config/pipeline'
-import { claimNextJob, initialCheckpoint, type ClaimOptions } from './claim'
-import { getExecutor } from './executors'
+import type { Sql } from '../db/types'
 import type { CheckpointerHandle } from './checkpointer'
 import type { JobCheckpoint, JobRow, StepExecutor } from './types'
+
+import { PIPELINE_VERSION } from '../../config/pipeline'
+import { claimNextJob, type ClaimOptions, initialCheckpoint } from './claim'
+import { getExecutor } from './executors'
 import { findCheckpointBefore, runWithRetry, sleep } from './worker-utils'
 
 const PipelineState = Annotation.Root({
@@ -13,24 +15,24 @@ const PipelineState = Annotation.Root({
   jobId: Annotation<string>,
   pipelineVersion: Annotation<string>,
   stepResults: Annotation<Record<string, unknown>>({
-    reducer: (a, b) => ({ ...a, ...b }),
     default: () => ({}),
+    reducer: (a, b) => ({ ...a, ...b }),
   }),
 })
 
 type PipelineStateT = typeof PipelineState.State
 
 export interface WorkerOptions {
-  steps: readonly PipelineStep[]
   checkpointer: CheckpointerHandle
+  claim?: ClaimOptions
   /** Переопределение исполнителей (тесты, этап 5) — ключ = step.executor */
   executors?: Record<string, StepExecutor>
   pollIntervalMs?: number
-  claim?: ClaimOptions
   retryDelayMs?: number
+  steps: readonly PipelineStep[]
 }
 
-export type JobOutcome = 'done' | 'paused' | 'cancelled' | 'failed'
+export type JobOutcome = 'cancelled' | 'done' | 'failed' | 'paused'
 
 /**
  * Постоянный воркер очереди анализа (TZ §8): один обработчик, состояние на сервере,
@@ -41,7 +43,7 @@ export class AnalysisWorker {
   private readonly sql: Sql
   private readonly opts: Required<Pick<WorkerOptions, 'pollIntervalMs' | 'retryDelayMs'>> & WorkerOptions
   private stopped = false
-  private looping: Promise<void> | null = null
+  private looping: null | Promise<void> = null
   /** Сигнал отмены текущей задачи — доставляется в исполняющийся шаг */
   private currentSignal: AbortSignal | null = null
 
@@ -122,7 +124,7 @@ export class AnalysisWorker {
     }
 
     // Возобновление после рестарта/паузы: продолжаем с последнего корректного шага
-    const streamInput: PipelineStateT | null = cp.graph_started
+    const streamInput: null | PipelineStateT = cp.graph_started
       ? null
       : {
           ideaId: job.idea_id,
@@ -138,20 +140,20 @@ export class AnalysisWorker {
     job: JobRow,
     graph: ReturnType<AnalysisWorker['buildGraph']>,
     streamConfig: Record<string, unknown>,
-    streamInput: PipelineStateT | null,
+    streamInput: null | PipelineStateT,
   ): Promise<JobOutcome> {
     const cp: JobCheckpoint = job.checkpoint ?? initialCheckpoint(job.id)
     const controller = new AbortController()
     this.currentSignal = controller.signal
     let controlPause = false
     let controlCancel = false
-    let completedStep: string | null = null
+    let completedStep: null | string = null
 
     try {
       const stream = await graph.stream(streamInput, {
         ...streamConfig,
-        streamMode: 'updates',
         signal: controller.signal,
+        streamMode: 'updates',
       })
       for await (const update of stream) {
         const stepId = Object.keys(update)[0] ?? null
@@ -268,12 +270,12 @@ export class AnalysisWorker {
     return async (state: PipelineStateT): Promise<Pick<PipelineStateT, 'stepResults'>> => {
       const output = await runWithRetry(
         async () => await exec({
-          sql: this.sql,
           ideaId: state.ideaId,
           jobId: state.jobId,
-          step,
-          state: state.stepResults,
           signal: this.currentSignal ?? new AbortController().signal,
+          sql: this.sql,
+          state: state.stepResults,
+          step,
         }),
         step,
         this.opts.retryDelayMs,
@@ -329,7 +331,7 @@ export class AnalysisWorker {
   private async markFailed(
     job: JobRow,
     cp: JobCheckpoint,
-    lastStep: string | null,
+    lastStep: null | string,
     error: unknown,
   ): Promise<void> {
     const message = error instanceof Error ? error.message : String(error)

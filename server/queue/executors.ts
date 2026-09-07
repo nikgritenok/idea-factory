@@ -1,5 +1,5 @@
-import type { Sql } from '../db/types'
 import type { ExecutorKind } from '../../config/pipeline'
+import type { Sql } from '../db/types'
 import type { StepExecutor } from './types'
 
 /**
@@ -14,16 +14,16 @@ const FIXTURE_DELAY_MS = 50
 const registry = new Map<ExecutorKind, StepExecutor>()
 
 registry.set('fixture', async (ctx) => {
-  const { step, signal } = ctx
+  const { signal, step } = ctx
   const started = Date.now()
   await delay(FIXTURE_DELAY_MS, signal)
   return {
     output: {
-      fixture: true,
-      step: step.id,
-      role: step.role,
       durationMs: Date.now() - started,
+      fixture: true,
       note: 'FIXTURE: заглушка шага пайплайна, реальный исполнитель подключается в этапе 5',
+      role: step.role,
+      step: step.id,
     },
   }
 })

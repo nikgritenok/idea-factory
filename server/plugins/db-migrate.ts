@@ -13,7 +13,7 @@ export default defineNitroPlugin(async () => {
   }
 
   try {
-    const { stdout, stderr } = await execFileAsync('dbmate', ['up'], {
+    const { stderr, stdout } = await execFileAsync('dbmate', ['up'], {
       env: { ...process.env, DATABASE_URL: `${databaseUrl}?sslmode=disable` },
       timeout: 30_000,
     })

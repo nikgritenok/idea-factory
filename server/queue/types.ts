@@ -1,6 +1,7 @@
 import type { Sql } from '../db/types'
-import { JobCheckpointSchema, JobRowSchema, PrioritySchema } from '../utils/schemas'
 import type { JobCheckpoint, JobRow, Priority } from '../utils/schemas'
+
+import { JobCheckpointSchema, JobRowSchema, PrioritySchema } from '../utils/schemas'
 
 export { JobCheckpointSchema, JobRowSchema, PrioritySchema }
 export type { JobCheckpoint, JobRow, Priority }
@@ -8,13 +9,13 @@ export type { JobCheckpoint, JobRow, Priority }
 export type QueuePriority = Priority
 
 export interface StepContext {
-  sql: Sql
   ideaId: string
   jobId: string
-  step: { id: string, role: string }
+  signal: AbortSignal
+  sql: Sql
   /** Результаты предыдущих шагов (state.stepResults) */
   state: Record<string, unknown>
-  signal: AbortSignal
+  step: { id: string, role: string }
 }
 
 export interface StepResult {

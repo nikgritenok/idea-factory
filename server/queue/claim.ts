@@ -1,12 +1,13 @@
 import type { Sql } from '../db/types'
-import { QUEUE_CONFIG } from '../../config/pipeline'
-import { effectivePriority } from './priority'
 import type { JobCheckpoint, JobRow } from './types'
 
+import { QUEUE_CONFIG } from '../../config/pipeline'
+import { effectivePriority } from './priority'
+
 export interface ClaimOptions {
-  now?: Date
-  antiStarvationMinutes?: number
   antiStarvationBump?: number
+  antiStarvationMinutes?: number
+  now?: Date
   /**
    * Режим восстановления: забрать задачу в статусе running (остаток после
    * сбоя/рестарта воркера) и продолжить её с чекпоинта. Вызывается воркером
@@ -58,7 +59,7 @@ export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<J
         job.priority,
         job.enqueued_at,
         now,
-        { antiStarvationMinutes: opts.antiStarvationMinutes, antiStarvationBump: opts.antiStarvationBump },
+        { antiStarvationBump: opts.antiStarvationBump, antiStarvationMinutes: opts.antiStarvationMinutes },
       )
       const isBetter
         = score > bestScore
@@ -87,7 +88,7 @@ export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<J
 
 /** Пустой чекпоинт для новой задачи */
 export function initialCheckpoint(jobId: string): JobCheckpoint {
-  return { thread_id: jobId, graph_started: false, last_step: null, rewind_to_step: null }
+  return { graph_started: false, last_step: null, rewind_to_step: null, thread_id: jobId }
 }
 
 export const DEFAULT_QUEUE_CONFIG = QUEUE_CONFIG

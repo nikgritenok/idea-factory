@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest'
 import postgres from 'postgres'
-import { titleFromTranscript, countActiveIdeas, IDEA_LIMIT_ACTIVE } from './ideas'
+import { beforeAll, describe, expect, it } from 'vitest'
+
 import { applyMigrations } from '../db/helpers'
+import { countActiveIdeas, IDEA_LIMIT_ACTIVE, titleFromTranscript } from './ideas'
 
 const DB
   = process.env.TEST_DATABASE_URL

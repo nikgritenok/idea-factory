@@ -1,6 +1,6 @@
-import { db } from '../../../utils/db'
-import { enqueueIdeaAnalysis } from '../../../queue/enqueue'
 import { QueueControlError } from '../../../queue/controls'
+import { enqueueIdeaAnalysis } from '../../../queue/enqueue'
+import { db } from '../../../utils/db'
 import { parseUuid } from '../../../utils/schemas'
 
 // POST /api/ideas/:id/run — запуск анализа идеи (TZ §8).
@@ -10,9 +10,9 @@ export default defineEventHandler(async (event) => {
   const sql = db()
 
   try {
-    const { job, created } = await enqueueIdeaAnalysis(sql, ideaId)
+    const { created, job } = await enqueueIdeaAnalysis(sql, ideaId)
     setResponseStatus(event, created ? 201 : 200)
-    return { job, created }
+    return { created, job }
   }
   catch (error) {
     if (error instanceof QueueControlError) {

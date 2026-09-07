@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { transcribeAudio, SttError } from '../utils/stt'
+
+import { SttError, transcribeAudio } from '../utils/stt'
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024
 const MAX_DURATION_SEC = 600
@@ -13,8 +14,8 @@ const TranscribeFormSchema = z.object({
       buf => buf.length <= MAX_AUDIO_BYTES,
       'Аудио больше 25 МБ — запишите короче',
     ),
-    type: z.string().default('audio/webm'),
     filename: z.string().optional(),
+    type: z.string().default('audio/webm'),
   }),
   durationSec: z.coerce.number().int().positive().max(
     MAX_DURATION_SEC,
@@ -56,17 +57,17 @@ export default defineEventHandler(async (event) => {
 
     if (!result.text) {
       return {
-        ok: false as const,
         code: 'empty_transcript' as const,
         message: 'Речь не распознана. Попробуйте записать ещё раз или введите текст.',
+        ok: false as const,
       }
     }
 
     return {
+      cost: result.cost,
+      durationSec: result.durationSec,
       ok: true as const,
       text: result.text,
-      durationSec: result.durationSec,
-      cost: result.cost,
     }
   }
   catch (e) {

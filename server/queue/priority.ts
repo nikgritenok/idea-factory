@@ -1,4 +1,5 @@
 import type { QueuePriority } from '../../config/pipeline'
+
 import { QUEUE_CONFIG } from '../../config/pipeline'
 
 /**

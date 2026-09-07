@@ -1,6 +1,7 @@
 import type { Sql } from '../db/types'
-import { initialCheckpoint } from './claim'
 import type { JobCheckpoint, JobRow, QueuePriority } from './types'
+
+import { initialCheckpoint } from './claim'
 
 export class QueueControlError extends Error {
   constructor(

@@ -14,7 +14,7 @@ export default defineNitroPlugin(async () => {
   await ensureMigrated()
 
   const handle = createCheckpointer()
-  const worker = new AnalysisWorker(db(), { steps: PIPELINE_STEPS, checkpointer: handle })
+  const worker = new AnalysisWorker(db(), { checkpointer: handle, steps: PIPELINE_STEPS })
 
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`[worker] ${signal}: останавливаюсь после текущей задачи`)
@@ -26,7 +26,7 @@ export default defineNitroPlugin(async () => {
   process.once('SIGTERM', () => void shutdown('SIGTERM'))
 
   console.log('[worker] WORKER_MODE=true — обработчик очереди запущен')
-  // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks
+  // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- fire-and-forget with error logging
   void worker.start().catch(async (error) => {
     console.error('[worker] цикл обработки упал:', error)
     await handle.end()

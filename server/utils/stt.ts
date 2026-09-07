@@ -2,9 +2,9 @@ const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
 export const STT_MODEL = 'microsoft/mai-transcribe-2'
 
 export interface TranscribeResult {
-  text: string
-  durationSec: number
   cost: number
+  durationSec: number
+  text: string
 }
 
 export class SttError extends Error {
@@ -33,9 +33,9 @@ export async function transcribeAudio(
   let res: Response
   try {
     res = await fetch(`${ROUTERAI_BASE}/audio/transcriptions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
+      headers: { Authorization: `Bearer ${apiKey}` },
+      method: 'POST',
     })
   }
   catch {
@@ -53,8 +53,8 @@ export async function transcribeAudio(
   }
 
   return {
-    text: (data.text ?? '').trim(),
-    durationSec: data.usage?.seconds ?? 0,
     cost: data.usage?.cost ?? 0,
+    durationSec: data.usage?.seconds ?? 0,
+    text: (data.text ?? '').trim(),
   }
 }

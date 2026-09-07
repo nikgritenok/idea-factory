@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const handle = createCheckpointer()
   await ensureCheckpointerTables(handle)
 
-  const worker = new AnalysisWorker(db(), { steps: PIPELINE_STEPS, checkpointer: handle })
+  const worker = new AnalysisWorker(db(), { checkpointer: handle, steps: PIPELINE_STEPS })
   const loop = worker.start()
 
   const shutdown = async (signal: string): Promise<void> => {
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   console.log('[worker] запущен, жду задачи из очереди (Ctrl+C — остановка)')
 }
 
-// eslint-disable-next-line promise/prefer-await-to-callbacks
+// eslint-disable-next-line promise/prefer-await-to-callbacks -- top-level entrypoint
 main().catch((error) => {
   console.error('[worker] не удалось запуститься:', error)
   process.exit(1)

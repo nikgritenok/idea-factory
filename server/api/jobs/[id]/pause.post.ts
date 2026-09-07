@@ -1,5 +1,5 @@
-import { db } from '../../../utils/db'
 import { pauseJob, QueueControlError } from '../../../queue/controls'
+import { db } from '../../../utils/db'
 import { parseUuid } from '../../../utils/schemas'
 
 // POST /api/jobs/:id/pause — пауза задачи (TZ §8)

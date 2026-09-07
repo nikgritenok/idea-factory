@@ -5,8 +5,8 @@ export function applyMigrations(databaseUrl: string): void {
   const url = databaseUrl.includes('?') ? databaseUrl : `${databaseUrl}?sslmode=disable`
   execFileSync('dbmate', ['up'], {
     env: { ...process.env, DATABASE_URL: url },
-    timeout: 30_000,
     stdio: 'pipe',
+    timeout: 30_000,
   })
 }
 
@@ -15,7 +15,7 @@ export function rollbackMigration(databaseUrl: string): void {
   const url = databaseUrl.includes('?') ? databaseUrl : `${databaseUrl}?sslmode=disable`
   execFileSync('dbmate', ['rollback'], {
     env: { ...process.env, DATABASE_URL: url },
-    timeout: 30_000,
     stdio: 'pipe',
+    timeout: 30_000,
   })
 }

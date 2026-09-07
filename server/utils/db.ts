@@ -1,7 +1,7 @@
-import postgres from 'postgres'
 import { execFileSync } from 'node:child_process'
+import postgres from 'postgres'
 
-let sql: ReturnType<typeof postgres> | null = null
+let sql: null | ReturnType<typeof postgres> = null
 let migrated = false
 
 export function db(): ReturnType<typeof postgres> {
@@ -14,6 +14,7 @@ export function db(): ReturnType<typeof postgres> {
   return sql
 }
 
+// eslint-disable-next-line ai-guard/no-async-without-await -- intentional: async for API consistency, callers use await
 export async function ensureMigrated(): Promise<void> {
   if (migrated) return
   const databaseUrl = process.env.DATABASE_URL
@@ -22,8 +23,8 @@ export async function ensureMigrated(): Promise<void> {
   try {
     execFileSync('dbmate', ['up'], {
       env: { ...process.env, DATABASE_URL: url },
-      timeout: 30_000,
       stdio: 'pipe',
+      timeout: 30_000,
     })
   }
   catch {

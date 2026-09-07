@@ -5,6 +5,12 @@ import vitest from '@vitest/eslint-plugin'
 import promise from 'eslint-plugin-promise'
 import slop from 'eslint-plugin-slop'
 import sonarjs from 'eslint-plugin-sonarjs'
+import aiGuard from 'eslint-plugin-ai-guard'
+import security from 'eslint-plugin-security'
+import noSecrets from 'eslint-plugin-no-secrets'
+import regexp from 'eslint-plugin-regexp'
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments'
+import perfectionist from 'eslint-plugin-perfectionist'
 
 export default withNuxt(
   {
@@ -155,6 +161,93 @@ export default withNuxt(
       // Отключённые:too noisy / не релевантны
       'sonarjs/no-commented-code': 'off',
       'sonarjs/no-unused-function-argument': 'off',
+    },
+  },
+
+  {
+    files: ['**/*.ts'],
+    plugins: { 'ai-guard': aiGuard },
+    rules: {
+      'ai-guard/no-empty-catch': 'error',
+      'ai-guard/no-broad-exception': 'error',
+      'ai-guard/no-catch-log-rethrow': 'error',
+      'ai-guard/no-catch-without-use': 'error',
+      'ai-guard/no-async-array-callback': 'error',
+      'ai-guard/no-await-in-loop': 'error',
+      'ai-guard/no-async-without-await': 'error',
+      'ai-guard/no-hardcoded-secret': 'error',
+      'ai-guard/no-eval-dynamic': 'error',
+      'ai-guard/no-sql-string-concat': 'error',
+      'ai-guard/no-unsafe-deserialize': 'error',
+      'ai-guard/no-console-in-handler': 'error',
+      'ai-guard/no-duplicate-logic-block': 'error',
+      'ai-guard/no-dead-branch': 'error',
+
+      // Конфликтует с @typescript-eslint/return-await: 'always'
+      'ai-guard/no-redundant-await': 'off',
+    },
+  },
+
+  {
+    files: ['**/*.ts'],
+    plugins: { security },
+    rules: {
+      'security/detect-unsafe-regex': 'error',
+      'security/detect-non-literal-regexp': 'error',
+      'security/detect-eval-with-expression': 'error',
+      'security/detect-child-process': 'error',
+      'security/detect-non-literal-fs-filename': 'error',
+      'security/detect-object-injection': 'off',
+      'security/detect-possible-timing-attacks': 'warn',
+    },
+  },
+
+  {
+    files: ['**/*.{ts,vue,mjs}'],
+    plugins: { 'no-secrets': noSecrets },
+    rules: {
+      'no-secrets/no-secrets': ['error', { tolerance: 5 }],
+    },
+  },
+
+  {
+    files: ['**/*.ts'],
+    plugins: { regexp },
+    rules: {
+      'regexp/no-dupe-characters-character-class': 'error',
+      'regexp/no-useless-quantifier': 'error',
+      'regexp/no-useless-flag': 'error',
+      'regexp/optimal-quantifier-concatenation': 'error',
+      'regexp/prefer-d': 'error',
+      'regexp/prefer-w': 'error',
+      'regexp/strict': 'error',
+    },
+  },
+
+  // @ts-expect-error eslint-comments types incompatible with flat config
+  {
+    plugins: { 'eslint-comments': eslintComments },
+    rules: {
+      'eslint-comments/no-unused-disable': 'error',
+      'eslint-comments/no-unlimited-disable': 'error',
+      'eslint-comments/disable-enable-pair': 'error',
+      'eslint-comments/require-description': ['error', { ignore: ['eslint-enable'] }],
+    },
+  },
+
+  {
+    files: ['**/*.{ts,vue}'],
+    ignores: ['nuxt.config.ts'],
+    plugins: { perfectionist },
+    rules: {
+      'perfectionist/sort-imports': ['error', {
+        type: 'natural',
+        order: 'asc',
+      }],
+      'perfectionist/sort-named-imports': 'error',
+      'perfectionist/sort-objects': ['error', { type: 'natural', order: 'asc' }],
+      'perfectionist/sort-interfaces': 'error',
+      'perfectionist/sort-union-types': 'error',
     },
   },
 

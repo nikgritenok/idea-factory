@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import postgres from 'postgres'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const DB = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5434/idea_factory_test?sslmode=disable'
 

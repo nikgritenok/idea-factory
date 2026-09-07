@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import postgres from 'postgres'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+
 import { applyMigrations } from '../db/helpers'
-import { enqueueIdeaAnalysis } from './enqueue'
 import { claimNextJob } from './claim'
+import { enqueueIdeaAnalysis } from './enqueue'
 
 const DB
   = process.env.TEST_DATABASE_URL
@@ -24,7 +25,7 @@ afterAll(async () => {
   await sql.end()
 })
 
-async function insertIdea(title: string, priority: 'high' | 'medium' | 'low' = 'medium'): Promise<string> {
+async function insertIdea(title: string, priority: 'high' | 'low' | 'medium' = 'medium'): Promise<string> {
   const [row] = await sql`
     insert into ideas (title, priority) values (${title}, ${priority}) returning id`
   return (row as { id: string }).id
@@ -33,7 +34,7 @@ async function insertIdea(title: string, priority: 'high' | 'medium' | 'low' = '
 describe('enqueueIdeaAnalysis (TZ §8: постановка в очередь)', () => {
   it('создаёт задачу и переводит идею draft → queued', async () => {
     const ideaId = await insertIdea('enqueue-базовый')
-    const { job, created } = await enqueueIdeaAnalysis(sql, ideaId)
+    const { created, job } = await enqueueIdeaAnalysis(sql, ideaId)
     expect(created).toBe(true)
     expect(job.status).toBe('queued')
     expect(job.idea_id).toBe(ideaId)
@@ -128,7 +129,7 @@ describe('anti-starvation (TZ §8)', () => {
     const freshMedium = await insertIdea('starve-medium', 'medium')
     await enqueueIdeaAnalysis(sql, freshMedium)
 
-    const claimed = await claimNextJob(sql, { now: new Date(), antiStarvationMinutes: 15 })
+    const claimed = await claimNextJob(sql, { antiStarvationMinutes: 15, now: new Date() })
     expect(claimed?.idea_id).toBe(ideaId)
   })
 
@@ -140,7 +141,7 @@ describe('anti-starvation (TZ §8)', () => {
     const freshMedium = await insertIdea('starve-early-medium', 'medium')
     await enqueueIdeaAnalysis(sql, freshMedium)
 
-    const claimed = await claimNextJob(sql, { now: new Date(), antiStarvationMinutes: 15 })
+    const claimed = await claimNextJob(sql, { antiStarvationMinutes: 15, now: new Date() })
     expect(claimed?.idea_id).toBe(freshMedium)
   })
 
@@ -152,7 +153,7 @@ describe('anti-starvation (TZ §8)', () => {
     const freshHigh = await insertIdea('starve-cap-high', 'high')
     await enqueueIdeaAnalysis(sql, freshHigh)
 
-    const claimed = await claimNextJob(sql, { now: new Date(), antiStarvationMinutes: 15 })
+    const claimed = await claimNextJob(sql, { antiStarvationMinutes: 15, now: new Date() })
     expect(claimed?.idea_id).toBe(freshHigh)
   })
 })

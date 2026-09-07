@@ -1,5 +1,5 @@
-import { db } from '../../../utils/db'
 import { cancelJob, QueueControlError } from '../../../queue/controls'
+import { db } from '../../../utils/db'
 import { parseUuid } from '../../../utils/schemas'
 
 // POST /api/jobs/:id/cancel — отмена задачи (TZ §8)

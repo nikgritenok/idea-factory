@@ -18,23 +18,23 @@ export default defineEventHandler(async (event) => {
   const jobRow = job as JobRow & { idea_title: string, funnel_stage: string, execution_status: string }
 
   return {
+    idea: {
+      execution_status: jobRow.execution_status,
+      funnel_stage: jobRow.funnel_stage,
+      id: jobRow.idea_id,
+      title: jobRow.idea_title,
+    },
     job: {
-      id: jobRow.id,
-      idea_id: jobRow.idea_id,
-      priority: jobRow.priority,
-      status: jobRow.status,
       attempts: jobRow.attempts,
       current_step: jobRow.current_step,
       enqueued_at: jobRow.enqueued_at,
-      started_at: jobRow.started_at,
-      finished_at: jobRow.finished_at,
       error: jobRow.error,
-    },
-    idea: {
-      id: jobRow.idea_id,
-      title: jobRow.idea_title,
-      funnel_stage: jobRow.funnel_stage,
-      execution_status: jobRow.execution_status,
+      finished_at: jobRow.finished_at,
+      id: jobRow.id,
+      idea_id: jobRow.idea_id,
+      priority: jobRow.priority,
+      started_at: jobRow.started_at,
+      status: jobRow.status,
     },
   }
 })
