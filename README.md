@@ -1,75 +1,36 @@
-# Nuxt Minimal Starter
+# «Фабрика идей» — запуск
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
-
-## Setup
-
-Make sure to install dependencies:
+## Локальная разработка
 
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
+npm run dev          # Nuxt на http://localhost:3000
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+Тестовая БД (для автотестов):
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
+docker run -d --name idea-factory-test-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=idea_factory_test \
+  -p 5434:5432 postgres:16-alpine
+npx vitest run
 ```
 
-## Production
-
-Build the application for production:
+## Прод (docker-compose)
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+cp .env.example .env   # заполнить секреты
+docker compose up -d --build
 ```
 
-Locally preview production build:
+Сервисы: `db` (postgres:16), `web` (Nuxt SSR, миграции применяются на старте),
+`worker` (persistent worker очереди), `validator` (микросервис-валидатор правил).
+
+Миграции применяются автоматически при старте `web` (`RUN_MIGRATIONS=true`).
+Ручное применение (читает `DATABASE_URL`):
 
 ```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
+DATABASE_URL=postgres://... npx tsx server/db/migrate-cli.ts up
+DATABASE_URL=postgres://... npx tsx server/db/migrate-cli.ts down   # откат последней
+DATABASE_URL=postgres://... npx tsx server/db/migrate-cli.ts status
 ```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
