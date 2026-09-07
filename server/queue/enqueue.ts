@@ -43,7 +43,7 @@ async function insertJob(sql: Sql, ideaId: string, priority: string, key: string
   // SELECT выше; если ключ у завершённой задачи — освобождаем его ниже
   const rows = await sql`
     insert into queue_jobs (idea_id, priority, effective_priority, idempotency_key)
-    values (${ideaId}, ${priority}, ${QUEUE_CONFIG.priorityBase[priority as 'high'] ?? QUEUE_CONFIG.priorityBase.medium}, ${key})
+    values (${ideaId}, ${priority}, ${QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase]}, ${key})
     on conflict (idempotency_key) do nothing
     returning *`
   const job = rows[0] as JobRow | undefined
@@ -68,7 +68,7 @@ async function insertJob(sql: Sql, ideaId: string, priority: string, key: string
     }
     const retry = await tx`
       insert into queue_jobs (idea_id, priority, effective_priority, idempotency_key)
-      values (${ideaId}, ${priority}, ${QUEUE_CONFIG.priorityBase[priority as 'high'] ?? QUEUE_CONFIG.priorityBase.medium}, ${key})
+      values (${ideaId}, ${priority}, ${QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase]}, ${key})
       returning *`
     const job2 = retry[0] as JobRow | undefined
     if (!job2) {

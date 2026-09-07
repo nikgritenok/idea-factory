@@ -1,5 +1,24 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-07 / шаг 5] ESLint strict mode + husky + lint-staged
+**Запрос:** внедрить жёсткий ESLint-конфиг с type-aware правилами, структурными лимитами, архитектурными границами app↔server, husky pre-commit hook и lint-staged
+**План:** объединить два подхода — архитектурные границы (ограничения импортов в app/server, запрет process.env/sql.raw) + жёсткость (no-unsafe-*, max-lines, max-params, switch-exhaustiveness, no-v-html); husky + lint-staged для принуждения на каждом коммите
+**Результат:** `eslint.config.mjs` — 7 блоков конфига (type-aware core, general rules, structural limits, app boundaries, server boundaries, overrides for CLI/plugins/tests, vitest); `package.json` — scripts lint/lint:fix с `--max-warnings 0`, lint-staged; `.husky/pre-commit` → `pnpm exec lint-staged`; зависимости: @vitest/eslint-plugin, husky, lint-staged; новый файл `server/queue/worker-utils.ts` (extract helper functions для worker.ts)
+**Проверка:** `pnpm lint` — 0 ошибок, 0 предупреждений; `pnpm test` — 34/34 тестов проходят; `pnpm typecheck` — ошибки предсуществующие (Zod v4 API + LangGraph типы), мой коммит исправил одну (`executors.ts:24` — добавлен `role` в тип `StepContext.step`)
+**Правки:** 4 цикла исправления: (1) `max-nesting-depth` — не встроенное ESLint-правило, удалено; (2) type-aware правила применялись к .mjs файлам без type-info — разделены на два блока (type-aware только для .ts/.vue); (3) `config/pipeline.ts` не найден project service — добавлен `allowDefaultProject`; (4) `process.env` в серверных файлах (db.ts, stt.ts, helpers.ts, checkpointer.ts) — добавлены исключения для env-слоя; (5) `readBody()` в API возвращал `any` — каст через `as unknown`; (6) `StepContext.step` не содержал `role` — расширен тип; (7) worker.ts 351 строка > 300 лимита — extract в worker-utils.ts + консолидация `recordStepProgress`
+
+### Что внедрено
+
+**Type-aware ядро:** `no-floating-promises`, `no-misused-promises`, `await-thenable`, `no-explicit-any` + семейство `no-unsafe-*`, `switch-exhaustiveness-check`, `consistent-type-imports`
+
+**Гигиена:** `eqeqeq`, `no-eval`, `no-new-func`, `no-console` (warn/error), `no-v-html` (защита XSS от untrusted input идей), Vue-specific правила
+
+**Структурные лимиты:** `max-lines` 300/250, `max-lines-per-function` 80, `max-params` 4
+
+**Архитектурные границы:** запрет postgres/pg/Node builtins/server imports в `app/`; запрет Pinia/window/document/process.env в `server/`; запрет `sql.raw()` в `server/`; запрет деструктуризации store (теряется реактивность)
+
+**Принуждение:** `--max-warnings 0` в scripts + lint-staged на pre-commit → агент не может закоммитить код с ошибками линтера
+
 ## [2026-09-07 / шаг 4] Очередь задач + LangGraph-воркер (checkpointing, управление)
 **Запрос:** этап 4 плана — постоянный воркер, LangGraph.js state graph, checkpointing в Postgres (PostgresSaver), приоритеты с anti-starvation, пауза/продолжение/отмена/повтор шага/смена приоритета, лимит 10 активных идей, идемпотентность enqueue
 **План:** использовать LangGraph.js (отраслевой стандарт) вместо кастомного stateGraph; дождаться стабильного релиза; queue на PostgreSQL (кастомная, не LangGraph — для приоритетов/anti-starvation); PostgresSaver для checkpointing; fixture executor для прототипа (стек 7 шагов из config/pipeline.ts)

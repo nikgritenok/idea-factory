@@ -5,7 +5,7 @@ import { IDEA_LIMIT_ACTIVE, IdeaCreateSchema } from '../../utils/schemas'
 export default defineEventHandler(async (event) => {
   const sql = db()
 
-  const body = await readBody(event)
+  const body = await readBody(event) as unknown
   const parsed = IdeaCreateSchema.parse(body)
 
   const activeCount = await countActiveIdeas(sql)

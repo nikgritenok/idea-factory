@@ -6,6 +6,7 @@ import { claimNextJob, initialCheckpoint, type ClaimOptions } from './claim'
 import { getExecutor } from './executors'
 import type { CheckpointerHandle } from './checkpointer'
 import type { JobCheckpoint, JobRow, StepExecutor } from './types'
+import { findCheckpointBefore, runWithRetry, sleep } from './worker-utils'
 
 const PipelineState = Annotation.Root({
   ideaId: Annotation<string>,
@@ -152,7 +153,7 @@ export class AnalysisWorker {
         signal: controller.signal,
       })
       for await (const update of stream) {
-        const stepId = Object.keys(update as Record<string, unknown>)[0] ?? null
+        const stepId = Object.keys(update)[0] ?? null
         if (stepId) {
           completedStep = stepId
           const step = this.stepById(stepId)
@@ -301,18 +302,13 @@ export class AnalysisWorker {
       update queue_jobs
       set current_step = ${stepId}, checkpoint = ${this.sql.json(nextCp)}
       where id = ${jobId}`
-    if (funnelStageAfter) {
-      await this.sql`
-        update ideas
-        set funnel_stage = ${funnelStageAfter}, execution_status = 'running', updated_at = now()
-        where id = (select idea_id from queue_jobs where id = ${jobId})`
-    }
-    else {
-      await this.sql`
-        update ideas
-        set execution_status = 'running', updated_at = now()
-        where id = (select idea_id from queue_jobs where id = ${jobId})`
-    }
+    const stageSet = funnelStageAfter
+      ? this.sql`funnel_stage = ${funnelStageAfter}, execution_status = 'running'`
+      : this.sql`execution_status = 'running'`
+    await this.sql`
+      update ideas
+      set ${stageSet}, updated_at = now()
+      where id = (select idea_id from queue_jobs where id = ${jobId})`
   }
 
   private async markPaused(job: JobRow, cp: JobCheckpoint): Promise<void> {
@@ -350,64 +346,4 @@ export class AnalysisWorker {
     await this.sql`
       update queue_jobs set checkpoint = ${this.sql.json(nextCp)} where id = ${jobId}`
   }
-}
-
-async function runWithRetry(
-  fn: () => Promise<{ output: unknown }>,
-  step: PipelineStep,
-  retryDelayMs: number,
-): Promise<{ output: unknown }> {
-  let lastError: unknown
-  for (let attempt = 0; attempt <= step.retries; attempt++) {
-    try {
-      return await withTimeout(fn(), step.timeoutMs)
-    }
-    catch (error) {
-      lastError = error
-      if (attempt < step.retries) {
-        await sleep(retryDelayMs)
-      }
-    }
-  }
-  throw lastError instanceof Error
-    ? new Error(`Шаг «${step.id}» не выполнен после ${step.retries + 1} попыток: ${lastError.message}`, { cause: lastError })
-    : lastError
-}
-
-function withTimeout(p: Promise<{ output: unknown }>, timeoutMs: number): Promise<{ output: unknown }> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(
-      () => reject(new Error(`Таймаут шага ${timeoutMs} мс`)),
-      timeoutMs,
-    )
-    p.then(
-      (v) => {
-        clearTimeout(t)
-        resolve(v)
-      },
-      (e) => {
-        clearTimeout(t)
-        reject(e)
-      },
-    )
-  })
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-/** История чекпоинтов: находит snapshot, из которого шаг выполнится повторно */
-async function findCheckpointBefore(
-  graph: { getStateHistory(config: unknown): AsyncIterable<{ next: readonly string[], config: Record<string, unknown> }> },
-  threadId: string,
-  stepId: string,
-): Promise<Record<string, unknown> | undefined> {
-  const config = { configurable: { thread_id: threadId } }
-  for await (const snapshot of graph.getStateHistory(config)) {
-    if (snapshot.next.includes(stepId)) {
-      return snapshot.config
-    }
-  }
-  return undefined
 }

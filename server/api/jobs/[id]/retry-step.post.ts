@@ -7,7 +7,7 @@ import { parseUuid, RetryStepBodySchema } from '../../../utils/schemas'
 // Body: { step?: string } — без параметра повторяется последний выполненный шаг.
 export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const body = await readBody(event).catch(() => ({}))
+  const body = (await readBody(event).catch((): unknown => ({}))) as unknown
   const parsed = RetryStepBodySchema.parse(body)
   const sql = db()
 

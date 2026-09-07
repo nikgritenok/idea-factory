@@ -11,7 +11,7 @@ export interface StepContext {
   sql: Sql
   ideaId: string
   jobId: string
-  step: { id: string }
+  step: { id: string, role: string }
   /** Результаты предыдущих шагов (state.stepResults) */
   state: Record<string, unknown>
   signal: AbortSignal

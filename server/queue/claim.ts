@@ -1,7 +1,7 @@
 import type { Sql } from '../db/types'
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { effectivePriority } from './priority'
-import type { JobCheckpoint, JobRow, QueuePriority } from './types'
+import type { JobCheckpoint, JobRow } from './types'
 
 export interface ClaimOptions {
   now?: Date
@@ -55,7 +55,7 @@ export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<J
     for (const row of candidates) {
       const job = row as JobRow
       const score = effectivePriority(
-        job.priority as QueuePriority,
+        job.priority,
         job.enqueued_at,
         now,
         { antiStarvationMinutes: opts.antiStarvationMinutes, antiStarvationBump: opts.antiStarvationBump },

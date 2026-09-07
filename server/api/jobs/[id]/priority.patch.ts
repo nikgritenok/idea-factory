@@ -5,12 +5,12 @@ import { parseUuid, PriorityBodySchema } from '../../../utils/schemas'
 // PATCH /api/jobs/:id/priority — смена приоритета задачи и идеи (TZ §8)
 export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const body = await readBody(event).catch(() => ({}))
+  const body = (await readBody(event).catch((): unknown => ({}))) as unknown
   const parsed = PriorityBodySchema.parse(body)
   const sql = db()
 
   try {
-    const job = await setJobPriority(sql, jobId, parsed.priority as Priority)
+    const job = await setJobPriority(sql, jobId, parsed.priority)
     return { job }
   }
   catch (error) {
