@@ -1,5 +1,33 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-08 / шаг 7] Observability + E2E Testing: Sentry + evlog + Playwright
+**Запрос:** внедрить минимальную инфраструктуру наблюдаемости и тестирования: Sentry (ошибки), evlog (структурированные логи с request_id), Playwright (E2E-тесты), TypeScript typecheck (уже есть)
+**План:** (1) `@sentry/nuxt` — модуль с DSN в runtimeConfig, client/server configs; (2) `server/utils/logger.ts` — минималистичный JSON-логгер в stdout (без зависимостей); (3) `server/middleware/request-id.ts` — генерация/проброс request_id через X-Request-Id header; (4) интеграция логгера в `apiError()`; (5) `@playwright/test` — конфиг с Chromium + webServer, e2e/smoke.spec.ts
+**Результат:**
+- `package.json` — `@sentry/nuxt@10.73.0`, `@playwright/test@1.63.0`, scripts: `e2e`, `e2e:ui`
+- `nuxt.config.ts` — модуль `@sentry/nuxt/module`, runtimeConfig: `sentryDsn`, `appEnv`
+- `sentry.client.config.ts` — client-side Sentry.init (DSN из runtimeConfig, tracesSampleRate 0.1)
+- `sentry.server.config.ts` — server-side Sentry.init
+- `server/utils/logger.ts` — `logger.info/warn/error(message, context?, requestId?)` — JSON в stdout
+- `server/middleware/request-id.ts` — X-Request-Id: генерация UUID или пропуск существующего
+- `server/utils/api/error.ts` — `apiError()` логирует ошибку перед throw
+- `playwright.config.ts` — Chromium, baseURL localhost:3000, webServer auto-start
+- `e2e/smoke.spec.ts` — 3 теста: homepage loads, meta title, API request-id header
+- `.env.example` — `SENTRY_DSN=`, `APP_ENV=development`
+- `.gitignore` — `test-results/`, `playwright-report/`
+**Проверка:** `npx eslint` на всех новых файлах — 0 ошибок; `pnpm typecheck` — только pre-existing ошибки (worker.ts, ideas.ts, migrate.test.ts — не связаны с этим шагом); Chromium скачан и готов
+**Fixes:** нет (первый проход)
+
+### Что внедрено
+
+**Sentry:** `@sentry/nuxt/module` — автоматическая инструментация Nuxt (client + server). DSN через `runtimeConfig` (не хардкод). Source maps заливаются через built-in Vite plugin. Включается в production или при `SENTRY_ENABLED=true`.
+
+**evlog:** Свой JSON-логгер без зависимостей. Формат: `{"timestamp":"...","level":"info","message":"...","request_id":"...","context":{...}}`. Логи идут в stdout — Docker собирает через `docker logs`. Request ID генерируется на каждом запросе (UUID v4) и пропускается дальше если пришёл от клиента.
+
+**Playwright:** E2E-тесты в `e2e/`, Chromium-only. `webServer` в конфиге автоматически поднимает `pnpm dev`. 3 smoke-теста: загрузка главной, meta title, наличие X-Request-Id в API-ответах.
+
+**Стандартная связка для переноса:** Sentry + evlog + Playwright + typecheck — минимальная инфраструктура, которую можно скопировать в любой следующий Nuxt-проект.
+
 ## [2026-09-07 / шаг 5] ESLint strict mode + husky + lint-staged
 **Запрос:** внедрить жёсткий ESLint-конфиг с type-aware правилами, структурными лимитами, архитектурными границами app↔server, husky pre-commit hook и lint-staged
 **План:** объединить два подхода — архитектурные границы (ограничения импортов в app/server, запрет process.env/sql.raw) + жёсткость (no-unsafe-*, max-lines, max-params, switch-exhaustiveness, no-v-html); husky + lint-staged для принуждения на каждом коммите

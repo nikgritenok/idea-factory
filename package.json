@@ -15,6 +15,8 @@
     "worker": "tsx server/queue/worker-cli.ts",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare": "husky"
@@ -27,8 +29,10 @@
   "dependencies": {
     "@langchain/langgraph": "^1.4.14",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.5",
+    "@sentry/nuxt": "^10.73.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "evlog": "^2.28.1",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "^4.5.2",
     "pg": "^8.23.0",
@@ -43,6 +47,8 @@
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@nuxt/eslint": "^1.17.0",
+    "@playwright/cli": "^0.1.19",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/pg": "^8.23.1",
     "@vitest/eslint-plugin": "^1.6.27",

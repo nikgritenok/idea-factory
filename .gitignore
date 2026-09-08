@@ -23,3 +23,16 @@ logs
 .env.*
 !.env.example
 opencode.json
+
+# Playwright
+test-results/
+playwright-report/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# evlog
+.evlog/
+
+# Agent skills (installed by evlog agents / playwright-cli install)
+.agents/
+.claude/

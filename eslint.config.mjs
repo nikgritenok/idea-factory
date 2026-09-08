@@ -256,7 +256,7 @@ export default withNuxt(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['config/*.ts'],
+          allowDefaultProject: ['config/*.ts', 'playwright.config.ts', 'e2e/*.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],

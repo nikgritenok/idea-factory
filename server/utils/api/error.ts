@@ -13,6 +13,7 @@ export interface ApiErrorBody {
 
 /**
  * Бросает API-ошибку в стандартном формате.
+ * evlog автоматически логирует ошибку через middleware (wide event per request).
  *
  * @param status HTTP status code
  * @param code   Machine-readable error code (UPPER_SNAKE_CASE)
