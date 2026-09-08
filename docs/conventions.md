@@ -172,7 +172,50 @@ export default defineEventHandler(async (event) => {
 - Unit: Vitest. Components: `@vue/test-utils` + Vitest. API: `nitro-test` or plain HTTP tests.
 - Tests are co-located: `*.test.ts` / `*.spec.ts`.
 
-## 11. Comments & Docs
+## 11. Accessibility (a11y)
+
+Accessibility is enforced at three levels. All three must pass before merging frontend changes.
+
+### Editor-time: eslint-plugin-vuejs-accessibility
+
+ESLint rules catch common a11y mistakes in Vue templates as you type:
+- Missing `alt` on `<img>`
+- Missing labels on form controls
+- Click events without keyboard equivalents
+- Invalid ARIA attributes
+
+Run with `pnpm lint`. Fix all `vuejs-accessibility/*` errors before committing.
+
+### Runtime: @nuxt/a11y (DevTools)
+
+The `@nuxt/a11y` module runs axe-core in the browser during development:
+- Open Nuxt DevTools → "Nuxt a11y" tab
+- Click "Scan" to check the current page
+- Violations are grouped by severity (critical → minor)
+- Click a violation to highlight affected elements with numbered badges
+- Enable "Auto-Scan" for continuous monitoring
+
+Use this when building new pages or components — catch issues visually before they reach CI.
+
+### CI: @axe-core/playwright
+
+Automated regression tests in `e2e/accessibility.spec.ts`:
+- Run via `pnpm e2e`
+- Tests scan key pages (homepage, ideas list, idea detail) against WCAG 2.0/2.1 AA
+- Any violation fails the test — blocks merge
+
+When adding a new page, add a corresponding test:
+```ts
+test('new-page has no accessibility violations', async ({ page }) => {
+  await page.goto('/new-page')
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'])
+    .analyze()
+  expect(results.violations).toEqual([])
+})
+```
+
+## 12. Comments & Docs
 
 - Update docs/comments whenever behavior changes.
 - Comments explain "why", not "what".

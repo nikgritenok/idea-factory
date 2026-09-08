@@ -46,10 +46,11 @@ pnpm build                  # Production build
 pnpm preview                # Local preview of the build
 
 # Checks (run after every change!)
-pnpm lint                   # ESLint
+pnpm lint                   # ESLint (includes vuejs-accessibility)
 pnpm lint:fix               # ESLint + auto-fix
 pnpm typecheck              # Type checking (vue-tsc via Nuxt)
 pnpm test                   # Vitest
+pnpm e2e                    # Playwright (includes axe-core a11y checks)
 
 # Database (dbmate)
 pnpm db:migrate             # Apply all pending migrations
@@ -169,6 +170,18 @@ Rules:
 
 - Every functional change — at least one automated test + one line in DEVLOG.md about manual verification.
 - For calculation modules, a reproducibility test is mandatory: same input data + seed → same result on re-run.
+
+## Accessibility (a11y)
+
+Three-layer enforcement — all must pass before merging frontend changes:
+
+1. **Editor-time** — `eslint-plugin-vuejs-accessibility` catches template issues (missing `alt`, labels, keyboard handlers) during coding. Fix all `vuejs-accessibility/*` errors before committing.
+2. **Runtime** — `@nuxt/a11y` in Nuxt DevTools: open DevTools → "Nuxt a11y" tab → Scan. Use when building new pages/components.
+3. **CI** — `e2e/accessibility.spec.ts` with `@axe-core/playwright`: automated regression against WCAG 2.0/2.1 AA. Any violation fails the test.
+
+When adding a new page: add a corresponding test in `e2e/accessibility.spec.ts`.
+
+Full details → `docs/conventions.md` §11.
 
 ## Ground rules (always)
 

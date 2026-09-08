@@ -45,7 +45,9 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
+    "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "^1.17.0",
     "@playwright/cli": "^0.1.19",
     "@playwright/test": "^1.63.0",
@@ -63,6 +65,7 @@
     "eslint-plugin-slop": "^0.1.3",
     "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-unicorn": "^74.0.0",
+    "eslint-plugin-vuejs-accessibility": "^2.6.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.0",
     "tailwindcss": "^4.3.3",
