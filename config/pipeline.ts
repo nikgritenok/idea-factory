@@ -1,6 +1,6 @@
 // Конфиг пайплайна анализа (TZ §6: роли/этапы — в конфиге, отдельно от логики интерфейса).
-// Этап 4: исполнители шагов — fixture (пометка FIXTURE, реальный прогон). Реальные
-// LLM-роли подключаются в этапе 5 заменой executor в этом конфиге — без правок кода очереди.
+// Этап 5: LLM-роли подключены (executor: 'llm'). Редактор отчёта остаётся fixture
+// (детерминированная сборка, не LLM).
 
 import type { FunnelStage, PipelineStep } from '../server/utils/schemas'
 
@@ -9,21 +9,21 @@ import { FunnelStageSchema, PipelineStepSchema } from '../server/utils/schemas'
 export { FunnelStageSchema, PipelineStepSchema }
 export type { FunnelStage, PipelineStep }
 
-export const PIPELINE_VERSION = 'v1-fixture'
+export const PIPELINE_VERSION = 'v1-llm'
 
-export type ExecutorKind = 'fixture' | (string & {})
+export type ExecutorKind = 'fixture' | 'llm' | (string & {})
 
 export const PIPELINE_STEPS: readonly PipelineStep[] = [
   {
-    executor: 'fixture',
+    executor: 'llm',
     id: 'orchestrator_plan',
     retries: 1,
     role: 'orchestrator',
-    timeoutMs: 30_000,
+    timeoutMs: 60_000,
     title: 'Оркестратор: план анализа',
   },
   {
-    executor: 'fixture',
+    executor: 'llm',
     funnelStageAfter: 'research',
     id: 'idea_analysis',
     retries: 1,
@@ -32,31 +32,31 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     title: 'Аналитик идеи: структура карточки',
   },
   {
-    executor: 'fixture',
+    executor: 'llm',
     id: 'market_research',
     retries: 1,
     role: 'market_analyst',
-    timeoutMs: 60_000,
+    timeoutMs: 90_000,
     title: 'Аналитик рынка и аудитории',
   },
   {
-    executor: 'fixture',
+    executor: 'llm',
     id: 'strategy',
     retries: 1,
     role: 'strategist',
-    timeoutMs: 60_000,
+    timeoutMs: 90_000,
     title: 'Стратег-аналитик: сценарии и эксперименты',
   },
   {
-    executor: 'fixture',
+    executor: 'llm',
     id: 'efficiency_model',
     retries: 1,
     role: 'efficiency_analyst',
-    timeoutMs: 60_000,
+    timeoutMs: 90_000,
     title: 'Аналитик эффективности: мат./стат. модель',
   },
   {
-    executor: 'fixture',
+    executor: 'llm',
     funnelStageAfter: 'critical_evaluation',
     id: 'critic_review',
     retries: 1,

@@ -2,12 +2,17 @@ import type { ExecutorKind } from '../../config/pipeline'
 import type { Sql } from '../db/types'
 import type { StepExecutor } from './types'
 
+import { createLlmExecutor } from './llm-executor'
+
 /**
  * Реестр исполнителей шагов пайплайна. Ключ = executor из config/pipeline.ts.
- * Этап 4: только fixture. Этап 5 добавит 'llm' (роль по конфигу) — код очереди не меняется.
+ * Этап 5: LLM-роли подключены (executor: 'llm').
  *
- * fixture — ЗАГЛУШКА: имитирует работу шага, явно помечена (AGENTS: не выдавать
- * имитацию за реальный прогон). Используется, пока LLM-исполнители не подключены.
+ * fixture — ЗАГЛУШКА: имитирует работу шага, явно помечена (FIXTURE: в логах).
+ * Используется для детерминированных шагов (report_build) и тестов.
+ *
+ * llm — РЕАЛЬНЫЙ LLM: вызывает z-ai/glm-5.3-flash с валидацией ответа.
+ * Каждая роль имеет свой промпт и Zod-схему для валидации.
  */
 const FIXTURE_DELAY_MS = 50
 
@@ -21,11 +26,22 @@ registry.set('fixture', async (ctx) => {
     output: {
       durationMs: Date.now() - started,
       fixture: true,
-      note: 'FIXTURE: заглушка шага пайплайна, реальный исполнитель подключается в этапе 5',
+      note: 'FIXTURE: заглушка шага пайплайна (детерминированная сборка или тест)',
       role: step.role,
       step: step.id,
     },
   }
+})
+
+/**
+ * LLM-исполнитель: вызывает реальный LLM для роли из pipeline.ts.
+ * Ключ 'llm' соответствует executor: 'llm' в config/pipeline.ts.
+ * Конкретная роль определяется по step.role из контекста.
+ */
+registry.set('llm', async (ctx) => {
+  const roleId = ctx.step.role
+  const executor = createLlmExecutor(roleId)
+  return executor(ctx)
 })
 
 async function delay(ms: number, signal: AbortSignal): Promise<void> {
@@ -55,7 +71,7 @@ export function hasOnlyFixtureExecutors(steps: readonly { executor: ExecutorKind
   return steps.every(s => s.executor === 'fixture')
 }
 
-/** Регистрация исполнителя — точка расширения для этапа 5 (реальные LLM-роли) */
+/** Регистрация исполнителя — точка расширения для новых типов исполнителей */
 export function registerExecutor(kind: ExecutorKind, exec: StepExecutor): void {
   registry.set(kind, exec)
 }

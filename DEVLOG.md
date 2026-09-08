@@ -1,5 +1,39 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-08 / шаг 5] Роли и промпты: LLM-интеграция + валидация ответов
+**Запрос:** подключить реальные ИИ-роли к пайплайну анализа, заменив fixture-заглушки. Обеспечить валидацию формата ответов моделей.
+**План:** (1) LLM-клиент (`server/utils/llm.ts`) — вызов z-ai/glm-5.3-flash через routerai.ru; (2) Zod-схемы для валидации ответов 6 LLM-ролей (`shared/schemas/roles/`); (3) Конфиги ролей (`config/roles/`) — промпты, параметры, схемы; (4) LLM-исполнитель (`server/queue/llm-executor.ts`) — вызов LLM + Zod-валидация; (5) Обновление pipeline — замена fixture на llm для 6 шагов; (6) Тесты
+**Результат:**
+- `server/utils/llm.ts` — LLM-клиент: `callLlm(schema, options)` с валидацией через Zod, `callLlmText()` для сырого текста, `LlmError` для ошибок
+- `shared/schemas/roles/` — 6 Zod-схем: OrchestratorPlan, StructuredIdea, MarketAnalysis, Strategy, EfficiencyModel, CriticReview
+- `config/roles/` — 7 конфигов ролей: system/user промпты, temperature, maxTokens, timeout, retries
+- `server/queue/llm-executor.ts` — `createLlmExecutor(roleId)` — вызов LLM с валидацией ответа
+- `config/pipeline.ts` — executor: 'llm' для шагов 1-6, 'fixture' для report_build; PIPELINE_VERSION = 'v1-llm'
+- `server/queue/executors.ts` — регистрация LLM-исполнителя в registry
+- Тесты: `server/utils/llm.test.ts` (8 тестов), `server/queue/llm-executor.test.ts` (3 теста), `config/roles/index.test.ts` (7 тестов) — все проходят
+**Проверка:** `pnpm vitest run server/utils/llm.test.ts server/queue/llm-executor.test.ts config/roles/index.test.ts` — 18/18 тестов проходят
+**Fixes:** (1) `beforeEach` не импортирован из vitest — добавлен в импорт; (2) Playground-тесты (Playwright, Postgres) не связаны с этим шагом — пропущены
+
+### Что внедрено
+
+**LLM-клиент:** fetch-клиент для routerai.ru (OpenAI-compatible /v1/chat/completions). Поддержка markdown-блоков JSON в ответах модели. Таймауты, повторы, логирование. Валидация ответа через Zod-схему.
+
+**Конфиги ролей:** 7 ролей в `config/roles/` — system prompt (роль + границы + формат), user prompt (шаблон с placeholders), параметры (temperature 0.3–0.5, maxTokens 1024–4096, timeout 60–90s). Каждая роль — отдельный файл с TypeScript-типизацией.
+
+**Валидация ответов:** Zod-схемы для каждого типа ответа (6 схем). Битый ответ модели → `LlmError` → retry (если retries > 0 в pipeline.ts). Маркировка: LLM-прогоны помечаются `LLM:` (не `FIXTURE:`).
+
+**Редактор отчёта:** остаётся fixture (детерминированная сборка, не LLM-роль). Логика сборки описана в `config/roles/report-editor.ts`.
+
+### Ключевые архитектурные решения
+
+1. **LLM-клиент без LangChain.js:** LangGraph.js используется для оркестрации графа, LLM-клиент — простой fetch (без лишней абстракции).
+
+2. **Валидация через Zod:** единый источник правды для форматов ответов. Модель возвращает JSON → парсинг → Zod-валидация → результат или ошибка.
+
+3. **Паттерн «роль → конфиг → промпт → LLM → валидация»:** каждая роль — отдельный конфиг, не смешано с кодом очереди.
+
+4. **Temperature по ролям:** аналитические роли (0.3) vs креативные (0.5). Максимальная предсказуемость для расчётов.
+
 ## [2026-09-08 / шаг 7] Observability + E2E Testing: Sentry + evlog + Playwright
 **Запрос:** внедрить минимальную инфраструктуру наблюдаемости и тестирования: Sentry (ошибки), evlog (структурированные логи с request_id), Playwright (E2E-тесты), TypeScript typecheck (уже есть)
 **План:** (1) `@sentry/nuxt` — модуль с DSN в runtimeConfig, client/server configs; (2) `server/utils/logger.ts` — минималистичный JSON-логгер в stdout (без зависимостей); (3) `server/middleware/request-id.ts` — генерация/проброс request_id через X-Request-Id header; (4) интеграция логгера в `apiError()`; (5) `@playwright/test` — конфиг с Chromium + webServer, e2e/smoke.spec.ts

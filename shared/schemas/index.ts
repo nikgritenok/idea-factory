@@ -184,3 +184,23 @@ export function safeParse<T extends z.ZodType>(
 ): { success: false, error: z.ZodError } | { success: true, data: z.infer<T> } {
   return schema.safeParse(data)
 }
+
+// ─── Role schemas (Step 5) ───────────────────────────────────────────────────
+
+export {
+  CriticReviewSchema,
+  EfficiencyModelSchema,
+  OrchestratorPlanSchema,
+  StructuredIdeaSchema,
+  MarketAnalysisSchema,
+  StrategySchema,
+} from './roles'
+
+export type {
+  CriticReview,
+  EfficiencyModel,
+  OrchestratorPlan,
+  StructuredIdea,
+  MarketAnalysis,
+  Strategy,
+} from './roles'

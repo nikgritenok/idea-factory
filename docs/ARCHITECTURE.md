@@ -49,12 +49,15 @@ server/               # Backend (Nitro)
     api/              # API helpers (error.ts — единый apiError)
     db.ts             # Синглтон postgres.js
     ideas.ts          # Хелперы для ideas, лимит 10 активных
+    llm.ts            # LLM-клиент (z-ai/glm-5.3-flash через routerai.ru)
     stt.ts            # STT через routerai.ru
   queue/              # Очередь задач + LangGraph-воркер
+    llm-executor.ts   # LLM-исполнитель (вызов LLM + Zod-валидация)
   plugins/            # Nitro-плагины (db-migrate, worker)
 
 shared/               # Общий код (app/ + server/)
   schemas/            # Zod schemas — единый источник правды
+    roles/            # Zod-схемы для валидации ответов LLM-ролей
   types/
   utils/
 
@@ -62,6 +65,7 @@ e2e/                  # Playwright E2E-тесты
   smoke.spec.ts       # Smoke-тесты: homepage, meta, request-id
 
 config/               # Конфиги пайплайна (steps, лимиты, очереди)
+  roles/              # Конфиги ролей (промпты, параметры, Zod-схемы)
 db/                   # SQL-миграции (dbmate)
 docs/                 # Документация
 
@@ -105,7 +109,7 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 - **Режимы запуска**:
   - `WORKER_MODE=true` — Nitro-плагин запускает воркер в фоне (docker-compose worker service)
   - `pnpm run worker` — standalone CLI (`worker-cli.ts`)
-- **Executor Registry**: плагинная архитектура исполнителей шагов (`registerExecutor`), fixture-реализация для прототипа, реальные ИИ-вызовы подключаются на этапе 5
+- **Executor Registry**: плагинная архитектура исполнителей шагов (`registerExecutor`), fixture-реализация для прототипа, реальные ИИ-вызовы подключены (этап 5)
 
 ### Проверенные сценарии (автотесты + ручная проверка)
 
@@ -136,6 +140,26 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 - **Паттерн time-travel**: `graph.invoke(null, historicalConfig)` для replay с исторического чекпоинта
 - **Примечание**: `graph.stream(null, config)` выбрасывает ошибку для已完成ных потоков; для time-travel используется `invoke`
 - **Anti-starvation**: формула `basePriority × 10 - attempts × 2 + ageInCycles × 0.5`, clamp 0–100
+
+### LLM-слой (этап 5)
+
+- **Модель**: `z-ai/glm-5.3-flash` через routerai.ru (OpenAI-compatible `/v1/chat/completions`)
+- **Клиент**: `server/utils/llm.ts` — `callLlm(schema, options)` с Zod-валидацией ответа
+- **Конфиги ролей**: `config/roles/` — system/user промпты, параметры (temperature, maxTokens, timeout), Zod-схемы для валидации
+- **Валидация**: битый ответ модели → `LlmError` → retry (если retries > 0)
+- **Маркировка**: LLM-прогоны помечаются `LLM:` (не `FIXTURE:`) в логах
+
+#### Роли пайплайна
+
+| Роль | Executor | Temperature | MaxTokens | Timeout |
+|------|----------|-------------|-----------|---------|
+| Оркестратор | `llm` | 0.3 | 1024 | 60s |
+| Аналитик идеи | `llm` | 0.3 | 2048 | 60s |
+| Аналитик рынка | `llm` | 0.5 | 4096 | 90s |
+| Стратег-аналитик | `llm` | 0.5 | 3072 | 90s |
+| Аналитик эффективности | `llm` | 0.3 | 3072 | 90s |
+| Критик | `llm` | 0.3 | 2048 | 60s |
+| Редактор отчёта | `fixture` | — | — | 30s |
 
 ## Версионирование API
 
