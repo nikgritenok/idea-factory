@@ -79,3 +79,17 @@
 **Результат:** провайдер `routerai` прописан в `opencode.json` (baseURL `https://routerai.ru/api/v1`), создан `.env.example`, ключ экспортирован в `~/.bashrc`
 **Проверка:** curl к `/v1/chat/completions` вернул HTTP 200 и осмысленный ответ модели (55 токенов). Первый запуск в opencode дал `401 Unauthorized` — `{env:ROUTERAI_API_KEY}` не резолвится в поле `apiKey` провайдера
 **Правки:** ключ прописан напрямую в `opencode.json`, файл добавлен в `.gitignore` (секрет не попадёт в репозиторий). Цикл исправления бага: 401 → замена env-ссылки на прямой ключ → перезапуск
+
+## [2026-09-08 / шаг 6] API governance + shared schemas + feature-based organization
+**Запрос:** внедрить минимальный API governance (20% → 80%) для AI-first разработки: единый формат ошибок, общие схемы, feature-based organization
+**План:** 3 изменения: (1) `shared/schemas/` — перенести Zod-схемы из `server/utils/schemas.ts` как единый источник правды; (2) `server/utils/api/error.ts` — apiError() helper с единым error envelope `{ error: { code, message, details? } }`; (3) AGENTS.md — API rules для AI-агента (validate→service→return, error format, naming). Бонус: feature-based organization в `app/features/` через AGENTS.md + conventions.md + ARCHITECTURE.md
+**Результат:**
+- `shared/schemas/index.ts` — все Zod-схемы (IdeaRow, JobRow, PipelineStep, API request/response, helpers)
+- `server/utils/schemas.ts` — re-export для обратной совместимости существующих импортов
+- `server/utils/api/error.ts` — `apiError(status, code, message, details?)` + `fromServiceError()`
+- `AGENTS.md` — секция "API rules" (error format, route handler pattern, input validation, naming, response format) + секция "Feature-based organization"
+- `docs/conventions.md` — обновлена структура проекта, добавлены правила feature folders
+- `docs/ARCHITECTURE.md` — обновлена структура проекта
+- Исправлена Zod v4 совместимость: `errorMap` → `error`, `SafeParseReturnType` → явный return type
+**Проверка:** `pnpm lint` ✅ (0 errors), `pnpm typecheck` — только pre-existing ошибки (worker.ts, migrate.test.ts, ideas.ts), `pnpm test` ✅ (34/34)
+**Fixes:** Zod v4 API changes — `errorMap` не существует, заменён на `error`; `z.SafeParseReturnType` не экспортируется, заменён на явный union type

@@ -23,9 +23,15 @@
 
 ```
 app/                  # Frontend (Vue 3)
-  components/         # UI-компоненты
-  composables/        # Переиспользуемая логика
-  pages/              # Файловый роутинг
+  features/           # Feature-based organization
+    ideas/            # Карточка идеи (компонент + composable + тесты)
+    funnel/           # Воронка
+    create-idea/      # Создание идеи
+    voice-input/      # Голосовой ввод
+  components/         # Shared UI-компоненты (кнопки, карточки)
+    ui/               # shadcn-vue
+  composables/        # Глобальные composable (useAuth, useToast)
+  pages/              # Тонкие обёртки (<FeatureName />)
   layouts/
   middleware/
   utils/
@@ -35,30 +41,22 @@ server/               # Backend (Nitro)
   api/                # API-маршруты (auto-imported by Nitro)
     ideas/            # CRUD идей + запуск анализа
     jobs/             # Управление задачами очереди
-  queue/              # Очередь задач + LangGraph-воркер
-    checkpointer.ts   # PostgresSaver (LangGraph checkpointing)
-    worker.ts         # AnalysisWorker — LangGraph StateGraph
-    worker-cli.ts     # CLI для запуска воркера
-    enqueue.ts        # Идемпотентная постановка в очередь
-    claim.ts          # Claim задач из очереди
-    controls.ts       # Pause/resume/cancel/retry-step/setPriority
-    executors.ts      # Реестр исполнителей шагов (fixture для прототипа)
-    priority.ts       # Anti-starvation формула
-    types.ts          # Интерфейсы очереди
-  plugins/            # Nitro-плагины (worker при WORKER_MODE=true)
-  utils/              # Утилиты сервера
+  utils/
+    api/              # API helpers (error.ts — единый apiError)
     db.ts             # Синглтон postgres.js
     ideas.ts          # Хелперы для ideas, лимит 10 активных
-    stt.ts            # STT через routerai.ru (для этапа 5+)
+    stt.ts            # STT через routerai.ru
+  queue/              # Очередь задач + LangGraph-воркер
+  plugins/            # Nitro-плагины
+
+shared/               # Общий код (app/ + server/)
+  schemas/            # Zod schemas — единый источник правды
+  types/
+  utils/
 
 config/               # Конфиги пайплайна (steps, лимиты, очереди)
-
 db/                   # SQL-миграции (dbmate)
-  migrations/         # Файлы миграций (up/down в одном файле)
-
 docs/                 # Документация
-  ARCHITECTURE.md     # Этот файл
-  conventions.md      # Код-стайл и правила
 ```
 
 ## Архитектура потока данных (TZ §6)

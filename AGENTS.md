@@ -77,6 +77,64 @@ Husky + lint-staged run `eslint --fix` (including stylistic rules via `stylistic
 - Efficiency calculation (math + stats model) — deterministic server code. AI comments and critiques the output, but the number always comes from a verifiable computation, not from an LLM response.
 - For random methods (bootstrap, etc.) — fixed seed, stored with the result.
 
+## API rules (enforced by convention, not tooling)
+
+Every API endpoint MUST follow these rules. Violations are bugs, not style preferences.
+
+### Errors: use `apiError()`, never raw `createError`
+
+```ts
+import { apiError } from '~~/server/utils/api/error'
+
+// ✅ Standardized envelope
+throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
+throw apiError(409, 'IDEA_LIMIT_REACHED', 'Достигнут лимит', { activeCount: 10 })
+
+// ❌ Raw createError — inconsistent format for clients
+throw createError({ statusCode: 404, statusMessage: 'not found' })
+```
+
+Error envelope: `{ error: { code: string, message: string, details?: unknown } }`
+
+### Route handler pattern: validate → service → return
+
+```ts
+// ✅ Thin handler: validate input, delegate to service, return
+export default defineEventHandler(async (event) => {
+  const id = parseUuid(getRouterParam(event, 'id'))
+  const body = await readValidatedBody(event, SomeSchema.parse)
+  const result = await someService(sql, id, body)
+  return result
+})
+
+// ❌ Business logic inside route handler
+export default defineEventHandler(async (event) => {
+  const rows = await sql`select * from users where id = ${id}`
+  // ... 50 lines of business logic ...
+})
+```
+
+### Input validation: Zod at boundaries
+
+- Route params: `parseUuid(getRouterParam(event, 'id'))`
+- Request body: `readValidatedBody(event, Schema.parse)` or `Schema.parse(await readBody(event))`
+- Query params: `getValidatedQuery(event, Schema.parse)`
+- All schemas live in `shared/schemas/`, imported via `~~/shared/schemas`
+
+### Naming and structure
+
+- URL: kebab-case, plural nouns (`/api/ideas`, `/api/jobs/:id`)
+- HTTP method = action: GET=read, POST=create/action, PATCH=update, DELETE=remove
+- No verb in URL: `/api/ideas` not `/api/getIdeas`
+- Route files: `server/api/<resource>/<verb>.<method>.ts` (e.g., `index.post.ts`, `[id].get.ts`)
+
+### Response format
+
+- Success: return the resource directly `{ idea }` or `{ job }` or `{ created, job }`
+- Created: `setResponseStatus(event, 201)` before return
+- No content: `setResponseStatus(event, 204)` + `return`
+- Never wrap in `{ data: ... }` unless the endpoint returns multiple top-level resources
+
 ## Nuxt 4 (important for AI agents)
 
 - **Nuxt 4, NOT Nuxt 2/3.** Don't use Nuxt 2 syntax: no `asyncData()`/`fetch()` options, no `context.app`, no `@nuxt/axios`.
@@ -87,6 +145,25 @@ Husky + lint-staged run `eslint --fix` (including stylistic rules via `stylistic
 - **Runtime config:** API keys and secrets go in `runtimeConfig` (server-side), not directly in `process.env`. Access via `useRuntimeConfig()`.
 - **Env variables:** prefix `NUXT_` (or `NUXT_PUBLIC_` for public ones). Never commit `.env`.
 - **Typed routes:** `navigateTo('/...')` and `<NuxtLink to="...">` are type-safe.
+
+## Feature-based organization (front-end)
+
+All user-facing features live in `app/features/<name>/`. Each feature folder contains its
+component, composable, and tests — colocated by behavior, not by file type.
+
+```
+app/features/
+  ideas/           → IdeaCard.vue, useIdea.ts, useIdea.spec.ts
+  funnel/          → FunnelBoard.vue, useFunnel.ts
+  create-idea/     → CreateIdeaForm.vue, useCreateIdea.ts
+  voice-input/     → VoiceRecorder.vue, useVoiceInput.ts
+```
+
+Rules:
+- Pages (`app/pages/`) are thin wrappers: `<template><FeatureName /></template>` only.
+- Shared UI primitives (buttons, inputs, cards) stay in `app/components/ui/`.
+- Global composables (useAuth, useToast) stay in `app/composables/`.
+- Types shared between app/ and server/ live in `shared/`.
 
 ## Tests
 

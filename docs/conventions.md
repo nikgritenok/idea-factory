@@ -30,28 +30,38 @@ These rules are mandatory for all agents and developers. For high-level agent be
 
 ```
 app/                  # frontend (Vue)
-  components/         # UI components
-  composables/        # reusable logic
-  pages/              # file-based routing
+  features/           # Feature-based organization (components + composables + tests)
+    ideas/            # Each feature: .vue + .ts composable + .spec.ts
+    funnel/
+    create-idea/
+    voice-input/
+  components/         # Shared UI primitives only (buttons, inputs, cards)
+    ui/               # shadcn-vue components
+  composables/        # Global composables (useAuth, useToast)
+  pages/              # Thin wrappers: <FeatureName /> only
   layouts/
   middleware/
   utils/
 server/               # Nitro backend
   api/                # API routes (server/api/**)
-  routes/             # additional server routes
   utils/
-  services/           # business logic
-  middleware/
-shared/               # code shared between app/ and server/
+    api/              # API helpers (error.ts, etc.)
+  queue/              # Queue worker + LangGraph
+  plugins/            # Nitro plugins
+shared/               # Code shared between app/ and server/
+  schemas/            # Zod schemas — single source of truth
   types/
-  schemas/            # Zod schemas
   utils/
+config/               # Pipeline config (roles, steps, queue params)
 ```
 
-- Shared types and Zod schemas → `shared/` only.
-- Backend business logic → `server/utils/` or `server/services/`.
-- Never duplicate types between frontend and backend.
-- No deep relative imports (`../../..`). Use path aliases.
+### Rules
+
+- **Feature folders**: all user-facing features live in `app/features/<name>/`. Each contains its component, composable, and tests.
+- **Pages are thin**: `app/pages/` files are 1-3 line wrappers that render a feature component. No logic in pages.
+- **Shared schemas**: all Zod schemas and shared types live in `shared/schemas/`. Never import from `server/utils/schemas` in new code — use `~~/shared/schemas`.
+- **No duplication**: never duplicate types between `app/` and `server/`.
+- **No deep imports**: no `../../..`. Use path aliases (`~~/`, `~/`).
 
 ## 4. Vue / Nuxt Rules
 
@@ -88,22 +98,32 @@ const emit = defineEmits<{
 - Validate all incoming data with Zod at the boundary (start of the handler).
 - Business logic lives in `server/utils/` or `server/services/`.
 - Handlers stay thin: validate → call service → return.
-- Errors: use `createError` from h3. Never swallow errors.
+- Errors: use `apiError()` from `~~/server/utils/api/error`, never raw `createError`.
 - No side effects at module top level.
+- Schemas: import from `~~/shared/schemas`, not from `server/utils/schemas`.
 
-Example API route:
+### Error format
+
+All API errors use a standard envelope:
+
+```ts
+import { apiError } from '~~/server/utils/api/error'
+
+throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
+throw apiError(409, 'IDEA_LIMIT_REACHED', 'Достигнут лимит', { activeCount: 10 })
+```
+
+Response: `{ error: { code: string, message: string, details?: unknown } }`
+
+### Example API route
 
 ```ts
 // server/api/users/[id].get.ts
-import { z } from 'zod'
+import { parseUuid } from '~~/shared/schemas'
 import { getUserById } from '~~/server/utils/users'
 
-const paramsSchema = z.object({
-  id: z.string().uuid()
-})
-
 export default defineEventHandler(async (event) => {
-  const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
+  const id = parseUuid(getRouterParam(event, 'id'))
   return getUserById(id)
 })
 ```
