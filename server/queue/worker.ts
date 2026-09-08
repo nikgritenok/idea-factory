@@ -7,13 +7,18 @@ import type { JobCheckpoint, JobRow, StepExecutor } from './types'
 
 import { PIPELINE_VERSION } from '../../config/pipeline'
 import { claimNextJob, type ClaimOptions, initialCheckpoint } from './claim'
-import { getExecutor } from './executors'
+import { getExecutor, hasOnlyFixtureExecutors } from './executors'
+import { createRun } from './run-protocol'
 import { findCheckpointBefore, runWithRetry, sleep } from './worker-utils'
 
 const PipelineState = Annotation.Root({
   ideaId: Annotation<string>,
   jobId: Annotation<string>,
   pipelineVersion: Annotation<string>,
+  runId: Annotation<string | undefined>({
+    default: () => undefined,
+    reducer: (a, b) => b ?? a,
+  }),
   stepResults: Annotation<Record<string, unknown>>({
     default: () => ({}),
     reducer: (a, b) => ({ ...a, ...b }),
@@ -123,6 +128,12 @@ export class AnalysisWorker {
       }
     }
 
+    // Создаём запись прогона (TZ §9) при начале задачи
+    const isFixture = hasOnlyFixtureExecutors(this.opts.steps)
+    const runId = cp.graph_started
+      ? (cp as unknown as { runId?: string }).runId
+      : await this.createRun(job, isFixture)
+
     // Возобновление после рестарта/паузы: продолжаем с последнего корректного шага
     const streamInput: null | PipelineStateT = cp.graph_started
       ? null
@@ -130,9 +141,10 @@ export class AnalysisWorker {
           ideaId: job.idea_id,
           jobId: job.id,
           pipelineVersion: PIPELINE_VERSION,
+          runId,
           stepResults: {},
         }
-    return await this.streamJob(job, graph, { ...config }, streamInput)
+    return await this.streamJob(job, graph, { ...config }, streamInput, runId)
   }
 
   /** Обычное исполнение/возобновление: поток событий шаг за шагом, пауза/отмена на границах */
@@ -141,6 +153,7 @@ export class AnalysisWorker {
     graph: ReturnType<AnalysisWorker['buildGraph']>,
     streamConfig: Record<string, unknown>,
     streamInput: null | PipelineStateT,
+    runId?: string,
   ): Promise<JobOutcome> {
     const cp: JobCheckpoint = job.checkpoint ?? initialCheckpoint(job.id)
     const controller = new AbortController()
@@ -184,6 +197,11 @@ export class AnalysisWorker {
           controlCancel = true
         }
         else {
+          // Завершаем прогон как failed
+          if (runId) {
+            const { finishRun } = await import('./run-protocol')
+            await finishRun(this.sql, runId, 'failed', error instanceof Error ? error.message : String(error))
+          }
           await this.markFailed(job, cp, completedStep, error)
           return 'failed'
         }
@@ -195,11 +213,21 @@ export class AnalysisWorker {
       return 'paused'
     }
     if (controlCancel) {
+      // Завершаем прогон как failed при отмене
+      if (runId) {
+        const { finishRun } = await import('./run-protocol')
+        await finishRun(this.sql, runId, 'failed', 'Cancelled')
+      }
       await this.markCancelled(job)
       return 'cancelled'
     }
 
     // Граф дошёл до конца — задача выполнена
+    // Завершаем прогон как completed
+    if (runId) {
+      const { finishRun } = await import('./run-protocol')
+      await finishRun(this.sql, runId, 'completed')
+    }
     await this.sql`
       update queue_jobs
       set status = 'done', finished_at = now(), checkpoint = ${this.sql.json({ ...cp, graph_started: true, last_step: completedStep } satisfies JobCheckpoint)}
@@ -342,6 +370,22 @@ export class AnalysisWorker {
       where id = ${job.id}`
     await this.sql`
       update ideas set execution_status = 'error', updated_at = now() where id = ${job.idea_id}`
+  }
+
+  /** Создаёт запись прогона (TZ §9) */
+  private async createRun(job: JobRow, isFixture: boolean): Promise<string> {
+    const componentVersions: Record<string, string> = {}
+    for (const step of this.opts.steps) {
+      componentVersions[step.role] = isFixture ? 'fixture' : 'z-ai/glm-5.3-flash'
+    }
+
+    return createRun(this.sql, {
+      ideaId: job.idea_id,
+      variant: isFixture ? 'fixture' : 'llm',
+      componentVersions,
+      configVersion: PIPELINE_VERSION,
+      isFixture,
+    })
   }
 
   private async clearRewind(jobId: string, cp: JobCheckpoint): Promise<void> {

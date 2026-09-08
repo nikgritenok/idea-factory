@@ -1,0 +1,17 @@
+{
+  "name": "validator",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Микросервис-валидатор правил для Фабрики идей (TZ §1/§11)",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "node src/index.ts",
+    "dev": "node --watch src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -2,10 +2,12 @@ import type { StepContext, StepResult } from './types'
 
 import { getRoleConfig } from '../../config/roles'
 import { callLlm, LlmError } from '../utils/llm'
+import { withRunCall } from './run-protocol'
 
 /**
  * LLM-исполнитель шагов пайплайна.
  * Вызывает реальный LLM (z-ai/glm-5.3-flash) с валидацией ответа.
+ * Записывает каждый вызов в run_calls через протокол прогона (TZ §9).
  *
  * Паттерн: role ID из pipeline.ts → конфиг роли → промпт → LLM → Zod-валидация → результат.
  * Битый ответ модели → LlmError → retry (если retries > 0).
@@ -77,6 +79,7 @@ function getIdeaTranscript(ctx: StepContext): string {
 
 /**
  * Создаёт LLM-исполнителя для указанной роли.
+ * Записывает каждый вызов в run_calls (протокол прогона TZ §9).
  */
 export function createLlmExecutor(roleId: string) {
   return async (ctx: StepContext): Promise<StepResult> => {
@@ -97,8 +100,12 @@ export function createLlmExecutor(roleId: string) {
     const ideaTranscript = getIdeaTranscript(ctx)
     const userPrompt = buildUserPrompt(roleId, ideaTranscript, ctx.state)
 
-    try {
-      const result = await callLlm(
+    // Запись вызова через протокол прогона
+    const runId = (ctx.state as { runId?: string }).runId
+    const request = { system: llmRole.system, user: userPrompt, temperature: llmRole.temperature, maxTokens: llmRole.maxTokens }
+
+    const callFn = async () => {
+      return callLlm(
         llmRole.schema as Parameters<typeof callLlm>[0],
         {
           system: llmRole.system,
@@ -108,26 +115,28 @@ export function createLlmExecutor(roleId: string) {
           timeoutMs: llmRole.timeoutMs,
         },
       )
-
-      return {
-        output: {
-          data: result.data,
-          metadata: {
-            model: 'z-ai/glm-5.3-flash',
-            role: roleId,
-            step: ctx.step.id,
-            usage: result.usage,
-            cost: result.cost,
-          },
-        },
-      }
     }
-    catch (error) {
-      if (error instanceof LlmError) {
-        // Пробрасываем LlmError для retry-механизма воркера
-        throw error
-      }
-      throw new LlmError(`Ошибка выполнения роли ${roleId}: ${error instanceof Error ? error.message : String(error)}`)
+
+    let result: Awaited<ReturnType<typeof callFn>>
+
+    if (ctx.sql && runId) {
+      result = await withRunCall(ctx.sql, runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn)
+    }
+    else {
+      result = await callFn()
+    }
+
+    return {
+      output: {
+        data: result.data,
+        metadata: {
+          model: 'z-ai/glm-5.3-flash',
+          role: roleId,
+          step: ctx.step.id,
+          usage: result.usage,
+          cost: result.cost,
+        },
+      },
     }
   }
 }
