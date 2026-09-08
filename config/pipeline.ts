@@ -9,7 +9,7 @@ import { FunnelStageSchema, PipelineStepSchema } from '../server/utils/schemas'
 export { FunnelStageSchema, PipelineStepSchema }
 export type { FunnelStage, PipelineStep }
 
-export const PIPELINE_VERSION = 'v1-llm'
+export const PIPELINE_VERSION = 'v2-calc'
 
 export type ExecutorKind = 'fixture' | 'llm' | (string & {})
 
@@ -48,12 +48,12 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     title: 'Стратег-аналитик: сценарии и эксперименты',
   },
   {
-    executor: 'llm',
+    executor: 'calc',
     id: 'efficiency_model',
     retries: 1,
     role: 'efficiency_analyst',
-    timeoutMs: 90_000,
-    title: 'Аналитик эффективности: мат./стат. модель',
+    timeoutMs: 30_000,
+    title: 'Аналитик эффективности: мат./стат. модель (детерминированный расчёт)',
   },
   {
     executor: 'llm',

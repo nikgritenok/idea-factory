@@ -161,7 +161,7 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 | Аналитик идеи | `llm` | 0.3 | 2048 | 60s |
 | Аналитик рынка | `llm` | 0.5 | 4096 | 90s |
 | Стратег-аналитик | `llm` | 0.5 | 3072 | 90s |
-| Аналитик эффективности | `llm` | 0.3 | 3072 | 90s |
+| Аналитик эффективности | `calc` (детерминированный) | — | — | 30s |
 | Критик | `llm` | 0.3 | 2048 | 60s |
 | Редактор отчёта | `fixture` | — | — | 30s |
 
@@ -192,6 +192,20 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 - **Запись**: каждый вызов LLM/валидатора → `run_calls` (входы, выходы, длительность, ошибки)
 - **Маркировка**: `is_fixture` в `runs`, `FIXTURE:` / `LLM:` в логах
 - **Сравнение**: 2 варианта на одном датасете через `server/utils/comparison.ts`
+
+### Расчётный модуль (TZ §5, этап 7)
+
+- **Расположение**: `server/utils/efficiency/` — детерминированный код, LLM не участвует в вычислении
+- **Executor**: `'calc'` (`server/queue/calc-executor.ts`) — шаг `efficiency_model` пайплайна
+- **Компоненты**:
+  - `prng.ts` — seeded PRNG (mulberry32) — детерминизм bootstrap
+  - `dataset.ts` — генератор модельного датасета 200 обращений (пометка `simulation`, TZ §15)
+  - `stats.ts` — bootstrap CI 95% разницы средних (10 000 ресемплов, фиксированный seed)
+  - `model.ts` — формулы (variant_minutes, effect_per_ticket, effect_volume), 3 сценария, чувствительность ±20%
+  - `decision.ts` — пороги → автоматическое влияние на рекомендацию (эффект < 0.5 мин → postpone; качество < 85% или CI включает ноль → validate_first)
+  - `compute.ts` — оркестрация + warnings
+- **Хранение**: таблица `calculations` (model_version, formula, params, seed, input_summary, result, warnings)
+- **Воспроизводимость**: тот же вход + seed → битово идентичный результат (тест `compute.test.ts`)
 
 ## Версионирование API
 
