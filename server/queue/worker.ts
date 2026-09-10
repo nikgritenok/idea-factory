@@ -1,4 +1,5 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
+import { traceable } from 'langsmith/traceable'
 
 import type { PipelineStep } from '../../config/pipeline'
 import type { CheckpointerHandle } from './checkpointer'

@@ -1,5 +1,7 @@
 import type { z } from 'zod'
 
+import { traceable } from 'langsmith/traceable'
+
 const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
 export const LLM_MODEL = 'z-ai/glm-5.3-flash'
 
@@ -40,7 +42,8 @@ export class LlmError extends Error {
  * Вызов LLM через routerai.ru (OpenAI-compatible /v1/chat/completions).
  * Возвращает сырой текст ответа модели.
  */
-async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usage?: LlmCallResult<unknown>['usage'], cost?: number }> {
+const callLlmRaw = traceable(
+  async (options: LlmCallOptions): Promise<{ text: string, usage?: LlmCallResult<unknown>['usage'], cost?: number }> => {
   const apiKey = process.env.ROUTERAI_API_KEY
   if (!apiKey) {
     throw new LlmError('LLM-ключ не настроен на сервере', 503)
@@ -109,7 +112,9 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
       totalTokens: data.usage?.total_tokens,
     },
   }
-}
+},
+  { name: 'llm-call' },
+)
 
 /**
  * Вызов LLM с валидацией ответа через Zod-схему.
