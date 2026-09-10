@@ -53,11 +53,14 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
       { content: options.user, role: 'user' },
     ],
     model: LLM_MODEL,
+    // Строгий JSON-режим: модель ОБЯЗАНА вернуть JSON по схеме из system prompt
+    response_format: { type: 'json_object' },
+    structured_outputs: true,
     temperature: options.temperature ?? 0.3,
   }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => { controller.abort() }, options.timeoutMs ?? 60_000)
+  const timeout = setTimeout(() => { controller.abort() }, options.timeoutMs ?? 300_000)
 
   let res: Response
   try {
@@ -127,7 +130,9 @@ export async function callLlm<T>(
     parsed = JSON.parse(jsonString.trim())
   }
   catch {
-    throw new LlmError('LLM вернул некорректный JSON')
+    // Диагностика: показываем начало сырого ответа (обрыв по maxTokens и т.п.)
+    const head = raw.text.slice(0, 120).replaceAll('\n', ' ')
+    throw new LlmError(`LLM вернул некорректный JSON (начало ответа: «${head}…», длина ${raw.text.length})`)
   }
 
   // Валидация через Zod

@@ -27,18 +27,13 @@ export const marketAnalystRole = {
 
 «${idea}»
 
-Определи:
-1. Размер рынка и нишу
-2. Тренды (минимум 2)
-3. Конкурентов/альтернативы (минимум 3) с сильными и слабыми сторонами
-4. Прото-персоны (минимум 3) с болями, целями и возражениями
-5. Сегменты аудитории (минимум 2)
-6. Ключевые выводы
-7. Уровень уверенности в данных`,
+Верни СТРОГО JSON ровно в таком формате (без markdown, без пояснений):
+{"marketSize":"строка с оценкой рынка","confidence":"low|medium|high","trends":["тренд 1","тренд 2"],"competitors":[{"name":"имя","description":"описание","strengths":["сила"],"weaknesses":["слабость"]}],"personas":[{"name":"имя","role":"роль","painPoints":["боль"],"goals":["цель"],"objections":["возражение"]}],"segments":[{"name":"сегмент","size":"размер","characteristics":["хар-ка"],"willingnessToPay":"low|medium|high"}],"insights":["вывод 1","вывод 2"]}
+Массивы competitors и personas — минимум 3 элемента, segments — минимум 2.`,
 
   schema: MarketAnalysisSchema as unknown as MarketAnalysis,
-  temperature: 0.5,
-  maxTokens: 4096,
-  timeoutMs: 90_000,
+  temperature: 0.2,
+  maxTokens: 8192,
+  timeoutMs: 300_000,
   retries: 1,
 }

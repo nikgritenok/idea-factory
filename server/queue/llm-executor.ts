@@ -63,18 +63,22 @@ function buildUserPrompt(stepId: string, ideaTranscript: string, previousResults
 
 /**
  * Получает транскрипт идеи из контекста.
- * Ищет в предыдущих результатах или в данных идеи.
+ * Ищет в предыдущих результатах, затем загружает из БД по ideaId.
  */
-function getIdeaTranscript(ctx: StepContext): string {
+async function getIdeaTranscript(ctx: StepContext): Promise<string> {
   // Ищем транскрипт в предыдущих результатах
   const ideaAnalysis = ctx.state.idea_analysis as { sourceTranscript?: string } | undefined
   if (ideaAnalysis?.sourceTranscript) {
     return ideaAnalysis.sourceTranscript
   }
 
-  // Если это первый шаг (оркестратор), транскрипт должен быть передан извне
-  // Пока используем заглушку — в реальности будет из БД
-  return (ctx.state as { transcript?: string }).transcript ?? ''
+  // Загружаем из БД — надёжный источник для любого шага
+  const idea = await ctx.db.orm.public.Ideas
+    .select('sourceTranscript')
+    .where((f) => f.id.eq(ctx.ideaId))
+    .first()
+
+  return idea?.sourceTranscript ?? ''
 }
 
 /**
@@ -97,7 +101,7 @@ export function createLlmExecutor(roleId: string) {
       retries?: number
     }
 
-    const ideaTranscript = getIdeaTranscript(ctx)
+    const ideaTranscript = await getIdeaTranscript(ctx)
     const userPrompt = buildUserPrompt(roleId, ideaTranscript, ctx.state)
 
     // Запись вызова через протокол прогона

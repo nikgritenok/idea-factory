@@ -1,5 +1,5 @@
 import { PIPELINE_STEPS } from '../../config/pipeline'
-import { db, ensureMigrated } from '../utils/db'
+import { db } from '../utils/db'
 import { createCheckpointer, ensureCheckpointerTables } from './checkpointer'
 import { AnalysisWorker } from './worker'
 
@@ -8,7 +8,6 @@ import { AnalysisWorker } from './worker'
  * Использование: pnpm run worker (DATABASE_URL из окружения, см. .env.example).
  */
 async function main(): Promise<void> {
-  await ensureMigrated()
 
   const handle = createCheckpointer()
   await ensureCheckpointerTables(handle)

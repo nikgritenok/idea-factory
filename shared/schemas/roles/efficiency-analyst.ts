@@ -7,13 +7,13 @@ import { z } from 'zod'
 
 export const BaselineMetricsSchema = z.object({
   /** Текущее значение (базовый показатель) */
-  currentValue: z.number(),
+  currentValue: z.coerce.number(),
   /** Метрика (например, "время на обработку") */
   metric: z.string(),
   /** Доля пропусков (0–1) */
-  missingRate: z.number().min(0).max(1),
+  missingRate: z.coerce.number().min(0).max(1),
   /** Количество наблюдений */
-  observations: z.number().int().positive(),
+  observations: z.coerce.number().int().positive(),
   /** Период данных */
   period: z.string(),
   /** Источник данных */
@@ -31,7 +31,7 @@ export const EffectFormulaSchema = z.object({
   name: z.string(),
   /** Параметры формулы */
   parameters: z.array(z.object({
-    defaultValue: z.number(),
+    defaultValue: z.coerce.number(),
     description: z.string(),
     name: z.string(),
     unit: z.string(),
@@ -43,22 +43,22 @@ export const EffectFormulaSchema = z.object({
 export const ScenarioEffectSchema = z.object({
   /** Доверительный интервал (если есть) */
   confidenceInterval: z.object({
-    lower: z.number(),
-    upper: z.number(),
+    lower: z.coerce.number(),
+    upper: z.coerce.number(),
   }).optional(),
   /** Описание сценария */
   description: z.string(),
   /** Ожидаемое изменение метрики */
-  expectedChange: z.number(),
+  expectedChange: z.coerce.number(),
   /** Название сценария */
   name: z.string(),
   /** Процент изменения */
-  percentChange: z.number(),
+  percentChange: z.coerce.number(),
 })
 
 export const EfficiencyModelSchema = z.object({
   /** Базовые показатели исходного процесса */
-  baselineMetrics: z.array(BaselineMetricsSchema).min(1).max(5),
+  baselineMetrics: z.array(BaselineMetricsSchema).min(1).max(50),
   /** Уверенность в расчёте (low/medium/high) */
   confidence: z.enum(['low', 'medium', 'high']),
   /** Мат. модель эффекта */
@@ -68,9 +68,9 @@ export const EfficiencyModelSchema = z.object({
   /** Рекомендация на основе расчёта */
   recommendation: z.enum(['develop', 'validate_first', 'postpone', 'reject', 'insufficient_data']),
   /** 3 сценария (базовый/благоприятный/неблагоприятный) */
-  scenarios: z.array(ScenarioEffectSchema).min(3).max(3),
+  scenarios: z.array(ScenarioEffectSchema).min(3).max(50),
   /** Порог полезного эффекта (минимальное улучшение) */
-  threshold: z.number(),
+  threshold: z.coerce.number(),
 })
 
 export type BaselineMetrics = z.infer<typeof BaselineMetricsSchema>

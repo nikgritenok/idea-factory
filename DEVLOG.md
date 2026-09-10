@@ -1,5 +1,21 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-10 / шаг 8] Пайплайн работает: LLM JSON mode + персистентность + MVP UI
+**Запрос:** пайплайн должен проходить все 7 шагов и сохранять результаты в БД для UI.
+**План:** (1) добавить `response_format: json_object` + `structured_outputs: true` в `callLlmRaw`; (2) исправить промпты ролей (русские enum → английские); (3) добавить `persistResults` в worker (agent_outputs + reports); (4) добавить `index.get.ts` для карточки идеи; (5) MVP UI компонент; (6) read-only демо-доступ.
+**Результат:**
+- `server/utils/llm.ts` — `response_format: { type: 'json_object' }`, `structured_outputs: true`, дефолт таймаут 300с
+- `config/roles/orchestrator.ts` — промпт с явными English-значениями для complexity/priority
+- `shared/schemas/roles/orchestrator.ts` — preprocessors для русских значений, фолбэки для missing fields
+- `server/queue/worker.ts` — `persistResults()`: помечает старые outputs/reports как outdated, создаёт новые из checkpointer state
+- `server/api/ideas/[id]/index.get.ts` — GET карточка идеи с версиями
+- `server/api/ideas/[id]/outputs.get.ts` + `report.get.ts` — фильтрация outdated
+- `app/features/ideas/IdeaCard.vue` — MVP форма «Тест обращения»
+- `app/features/funnel/FunnelBoard.vue` + `app/features/jobs/JobProgress.vue` — readonly prop для демо-режима
+- 2 облегчённых тест-кейса создано (чат-бот, генератор презентаций)
+**Проверка:** пайплайн завершён успешно (7/7 шагов), report=validate_first, score=56.0, 7 outputs, funnel_stage=decision. `pnpm typecheck` — 0 ошибок.
+**Fixes:** (1) orchestrator возвращал русские enum («средняя» вместо «medium») — добавлен маппинг в Zod schema; (2) `steps` обязателен но модель его有时 не возвращала — добавлен `.catch(['анализ идеи'])`; (3) critic output был вложен в `{ data: {...} }` — исправлен `persistResults`; (4) `AgentOutputs` не имел поля `outputIndex` — удалён из create.
+
 ## [2026-09-08 / шаг 7a] Расчётный модуль: детерминированный расчёт эффективности
 **Запрос:** этап 7 плана — мат. модель (формулы видны), стат. модель (bootstrap/CI, фиксированный seed), 3 сценария, пороги → автоматическое влияние на рекомендацию. Число — из проверяемого кода, не из LLM (TZ §5, AGENTS.md).
 **План:** (1) `server/utils/efficiency/prng.ts` — mulberry32; (2) `dataset.ts` — генератор модельного датасета 200 обращений (seed фиксируется, помечено simulation); (3) `stats.ts` — bootstrap CI 95% разницы средних; (4) `model.ts` — формулы + 3 сценария + чувствительность ±20%; (5) `decision.ts` — пороги → рекомендация; (6) `compute.ts` — оркестрация; (7) executor `'calc'` + шаг efficiency_model переключён с 'llm' на 'calc'.

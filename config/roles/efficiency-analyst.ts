@@ -40,7 +40,7 @@ ${baseline}
 
   schema: EfficiencyModelSchema as unknown as EfficiencyModel,
   temperature: 0.3,
-  maxTokens: 3072,
-  timeoutMs: 90_000,
+  maxTokens: 8192,
+  timeoutMs: 300_000,
   retries: 1,
 }

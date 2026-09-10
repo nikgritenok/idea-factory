@@ -19,7 +19,7 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     id: 'orchestrator_plan',
     retries: 1,
     role: 'orchestrator',
-    timeoutMs: 60_000,
+    timeoutMs: 300_000,
     title: 'Оркестратор: план анализа',
   },
   {
@@ -28,7 +28,7 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     id: 'idea_analysis',
     retries: 1,
     role: 'idea_analyst',
-    timeoutMs: 60_000,
+    timeoutMs: 300_000,
     title: 'Аналитик идеи: структура карточки',
   },
   {
@@ -36,7 +36,7 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     id: 'market_research',
     retries: 1,
     role: 'market_analyst',
-    timeoutMs: 90_000,
+    timeoutMs: 300_000,
     title: 'Аналитик рынка и аудитории',
   },
   {
@@ -44,7 +44,7 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     id: 'strategy',
     retries: 1,
     role: 'strategist',
-    timeoutMs: 90_000,
+    timeoutMs: 300_000,
     title: 'Стратег-аналитик: сценарии и эксперименты',
   },
   {
@@ -61,7 +61,7 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
     id: 'critic_review',
     retries: 1,
     role: 'critic',
-    timeoutMs: 60_000,
+    timeoutMs: 300_000,
     title: 'Критик: слабые места, стоп-факторы',
   },
   {

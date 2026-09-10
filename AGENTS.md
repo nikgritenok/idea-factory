@@ -288,3 +288,14 @@ in production, but it is a safety net — not a substitute for choosing the fiel
 Check coverage with `npx @evlog/cli map --no-write`. Diagnose setup with `npx @evlog/cli doctor`.
 Deeper guidance is in the `review-logging-patterns` skill — read it before a logging change.
 <!-- evlog:end -->
+
+## Prisma 8 — database access (MCP + rules)
+
+Prisma MCP server is available (tools: `migrate-status`, `migrate-dev`, `migrate-reset`, `db-seed`, `studio`, `lint`, `schema`). Use MCP tools in preference to raw `prisma` CLI calls.
+
+- **Prisma 8, NOT v5/v6.** CLI flags and defaults differ from most internet tutorials. Trust `pnpm prisma --help` and the official v8 changelog, not blog posts.
+- Schema of record: `src/prisma/contract.prisma` (inferred contract; use `pnpm contract:emit` after edits, `pnpm contract:infer` to re-infer from the live DB).
+- Migrations live in `migrations/app/` (SQL, applied via `pnpm db:migrate`). Never hand-edit applied migrations — add a new one.
+- **`migrate-reset` destroys all data.** Run it only after the human explicitly confirms in chat. Never as a "fix" for a failing migration without asking.
+- Dev DB is Postgres in Docker (`idea-factory-db-1`, host port 5433, `DATABASE_URL` in `.env`). Test DB on 5434. Never point migrations at production without confirmation.
+- After any schema change: run migration, then `pnpm typecheck` and `pnpm test` — types are generated from the schema, so stale generated code = failing typecheck.

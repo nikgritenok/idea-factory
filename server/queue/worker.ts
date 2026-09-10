@@ -222,6 +222,9 @@ export class AnalysisWorker {
     }
 
     // Граф дошёл до конца — задача выполнена
+    // Сохраняем результаты шагов в agent_outputs и reports (персистентность для UI)
+    await this.persistResults(job.ideaId, runId, cp)
+
     // Завершаем прогон как completed
     if (runId) {
       const { finishRun } = await import('./run-protocol')
@@ -237,10 +240,69 @@ export class AnalysisWorker {
     await this.db.orm.public.Ideas
       .where(f => f.id.eq(job.ideaId))
       .update({
-        executionStatus: 'paused',
+        funnelStage: 'decision',
         updatedAt: new Date(),
       })
     return 'done'
+  }
+
+  /** Сохраняет результаты шагов пайплайна в agent_outputs и reports (UI персистентность) */
+  private async persistResults(ideaId: string, runId: string | undefined, cp: JobCheckpoint): Promise<void> {
+    try {
+      // Помечаем старые outputs как outdated
+      await this.db.orm.public.AgentOutputs
+        .where(f => f.ideaId.eq(ideaId))
+        .update({ outdated: true })
+
+      // Читаем финальное состояние из чекпоинтера
+      const graph = this.buildGraph()
+      const config = { configurable: { thread_id: cp.thread_id } }
+      const snapshot = await graph.getState(config)
+      const stepResults = (snapshot.values as { stepResults?: Record<string, unknown> })?.stepResults ?? {}
+
+      // Сохраняем каждый шаг в agent_outputs
+      for (const step of this.opts.steps) {
+        const result = stepResults[step.id]
+        if (result === undefined) continue
+        await this.db.orm.public.AgentOutputs.create({
+          ideaId,
+          formatValid: true,
+          output: result,
+          role: step.role ?? step.id,
+          runId: runId ?? null,
+        })
+      }
+
+      // Собираем отчёт из critic_review (финальный шаг)
+      const criticResult = stepResults['critic_review'] as Record<string, unknown> | undefined
+      if (criticResult) {
+        // Помечаем старые отчёты как outdated
+        await this.db.orm.public.Reports
+          .where(f => f.ideaId.eq(ideaId))
+          .update({ outdated: true })
+
+        // Данные критика могут быть вложены в { data: {...}, metadata: {...} }
+        const nested = (criticResult as { data?: Record<string, unknown> })?.data ?? criticResult as Record<string, unknown>
+        const rec = nested as { recommendation?: string, overallScore?: number, score?: number, stopFactors?: unknown[] }
+        const existing = await this.db.orm.public.Reports
+          .where(f => f.ideaId.eq(ideaId))
+          .orderBy(f => f.version.desc())
+          .first()
+        const nextVersion = existing ? ((existing as { version: number }).version + 1) : 1
+
+        await this.db.orm.public.Reports.create({
+          ideaId,
+          recommendation: rec.recommendation ?? null,
+          score: rec.overallScore ?? rec.score ?? null,
+          sections: nested,
+          stopFactors: rec.stopFactors ?? [],
+          version: nextVersion,
+        })
+      }
+    }
+    catch (err) {
+      console.error('[worker] persistResults ошибка:', err)
+    }
   }
 
   /**
@@ -311,7 +373,7 @@ export class AnalysisWorker {
           ideaId: state.ideaId,
           jobId: state.jobId,
           signal: this.currentSignal ?? new AbortController().signal,
-          state: state.stepResults,
+          state: { ...state.stepResults, runId: state.runId },
           step,
         }),
         step,

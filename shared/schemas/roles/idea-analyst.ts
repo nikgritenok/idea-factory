@@ -7,21 +7,21 @@ import { z } from 'zod'
 
 export const StructuredIdeaSchema = z.object({
   /** Допущения (на чём основана идея) */
-  assumptions: z.array(z.string()).max(10),
+  assumptions: z.array(z.string()).max(50),
   /** Целевая аудитория */
-  audience: z.string().min(5).max(300),
+  audience: z.string().min(5).max(2000),
   /** Ограничения (технические, ресурсные, временные) */
-  constraints: z.array(z.string()).max(10),
+  constraints: z.array(z.string()).max(50),
   /** Описание проблемы, которую решает идея */
-  problem: z.string().min(10).max(500),
+  problem: z.string().min(10).max(2000),
   /** Исходный текст идеи (без изменений) */
   sourceTranscript: z.string(),
   /** Ключевые метрики для измерения успеха */
-  successMetrics: z.array(z.string()).max(5),
+  successMetrics: z.array(z.string()).max(50),
   /** Название идеи (одна фраза) */
-  title: z.string().min(1).max(120),
+  title: z.string().min(1).max(2000),
   /** Ключевая ценность / выгода */
-  value: z.string().min(5).max(300),
+  value: z.string().min(5).max(2000),
 })
 
 export type StructuredIdea = z.infer<typeof StructuredIdeaSchema>

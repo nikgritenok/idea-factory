@@ -30,19 +30,19 @@ export const MarketSegmentSchema = z.object({
 
 export const MarketAnalysisSchema = z.object({
   /** Конкуренты/альтернативы (минимум 3) */
-  competitors: z.array(CompetitorSchema).min(3).max(10),
+  competitors: z.array(CompetitorSchema).min(3).max(50),
   /** Уровень уверенности в данных (low/medium/high) */
   confidence: z.enum(['low', 'medium', 'high']),
   /** Ключевые выводы по рынку */
-  insights: z.array(z.string()).min(2).max(5),
+  insights: z.array(z.string()).min(2).max(50),
   /** Общая оценка рынка (рыночная ниша) */
   marketSize: z.string(),
   /** Прото-персоны (минимум 3) */
-  personas: z.array(PersonaSchema).min(3).max(5),
+  personas: z.array(PersonaSchema).min(3).max(50),
   /** Сегменты аудитории */
-  segments: z.array(MarketSegmentSchema).min(2).max(5),
+  segments: z.array(MarketSegmentSchema).min(2).max(50),
   /** Тренды рынка */
-  trends: z.array(z.string()).min(2).max(5),
+  trends: z.array(z.string()).min(2).max(50),
 })
 
 export type Competitor = z.infer<typeof CompetitorSchema>

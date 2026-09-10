@@ -10,10 +10,10 @@ export const ScenarioSchema = z.object({
   /** Ожидаемый эффект (описание) */
   effect: z.string(),
   /** Ключевые факторы успеха/провала */
-  keyFactors: z.array(z.string()).min(1).max(5),
+  keyFactors: z.array(z.string()).min(1).max(50),
   name: z.string(),
   /** Вероятность наступления (0–1) */
-  probability: z.number().min(0).max(1),
+  probability: z.coerce.number().min(0).max(1),
   /** Благоприятный / базовый / неблагоприятный */
   type: z.enum(['optimistic', 'base', 'pessimistic']),
 })
@@ -35,17 +35,17 @@ export const ExperimentSchema = z.object({
 
 export const StrategySchema = z.object({
   /** Приоритет эксперимента (что проверять первым) */
-  experimentPriority: z.number().int().positive(),
+  experimentPriority: z.coerce.number().int().positive(),
   /** Проверяемые гипотезы (минимум 3) */
-  experiments: z.array(ExperimentSchema).min(3).max(5),
+  experiments: z.array(ExperimentSchema).min(3).max(50),
   /** Стратегические рекомендации */
-  recommendations: z.array(z.string()).min(2).max(5),
+  recommendations: z.array(z.string()).min(2).max(50),
   /** Рекомендуемый сценарий */
   recommendedScenario: z.string(),
   /** Риски, которые могут повлиять на стратегию */
-  risks: z.array(z.string()).min(1).max(5),
+  risks: z.array(z.string()).min(1).max(50),
   /** Варианты развития (минимум 2) */
-  scenarios: z.array(ScenarioSchema).min(2).max(5),
+  scenarios: z.array(ScenarioSchema).min(2).max(50),
 })
 
 export type Scenario = z.infer<typeof ScenarioSchema>

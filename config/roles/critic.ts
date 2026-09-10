@@ -31,17 +31,13 @@ export const criticRole = {
 Данные анализа:
 ${analysis}
 
-Определи:
-1. Слабые места (минимум 2) с серьёзностью и способами смягчения
-2. Стоп-факторы (если есть)
-3. Общую оценку (0–100)
-4. Рекомендацию
-5. Обоснование рекомендации
-6. Следующие шаги`,
+Верни СТРОГО JSON ровно в таком формате (без markdown, без пояснений):
+{"weaknesses":[{"description":"слабое место","severity":"high","mitigation":"как смягчить"}],"stopFactors":[{"description":"стоп-фактор","reason":"почему","workaround":"обходной путь если есть"}],"overallScore":50,"confidence":"medium","recommendation":"develop","reasoning":"обоснование от 20 символов","nextSteps":["шаг 1"]}
+Массив weaknesses — минимум 2 элемента. stopFactors — пустой массив [], если стоп-факторов нет.`,
 
   schema: CriticReviewSchema as unknown as CriticReview,
-  temperature: 0.3,
-  maxTokens: 2048,
-  timeoutMs: 60_000,
+  temperature: 0.15,
+  maxTokens: 8192,
+  timeoutMs: 300_000,
   retries: 1,
 }

@@ -5,6 +5,7 @@ import { extractApiMessage } from './types'
 
 const route = useRoute()
 const ideaId = route.params.id as string
+const isDemo = computed(() => route.query.demo === '1')
 
 const idea = ref<Awaited<ReturnType<typeof fetchIdea>>>(null)
 const job = ref<JobSummary | null>(null)
@@ -12,6 +13,12 @@ const loading = ref(true)
 const loadError = ref<null | string>(null)
 const actionError = ref<null | string>(null)
 const busy = ref(false)
+
+// MVP state
+const ticketText = ref('')
+const mvpBusy = ref(false)
+const mvpResult = ref<null | { classification: unknown, validated: boolean, errors: string[] }>(null)
+const mvpError = ref<null | string>(null)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -67,6 +74,26 @@ async function runAnalysis(): Promise<void> {
   }
 }
 
+async function submitMvp(): Promise<void> {
+  if (!ticketText.value.trim()) return
+  mvpBusy.value = true
+  mvpError.value = null
+  mvpResult.value = null
+  try {
+    const data = await $fetch<{ classification: unknown, validated: boolean, errors: string[] }>(`/api/ideas/${ideaId}/mvp`, {
+      method: 'POST',
+      body: { ticketText: ticketText.value.trim() },
+    })
+    mvpResult.value = data
+  }
+  catch (err: unknown) {
+    mvpError.value = extractApiMessage(err)
+  }
+  finally {
+    mvpBusy.value = false
+  }
+}
+
 const pollTimer = ref<null | ReturnType<typeof setInterval>>(null)
 
 onMounted(async () => {
@@ -119,6 +146,13 @@ onUnmounted(() => {
           class="text-sm text-muted-foreground hover:text-foreground"
         >← Воронка</NuxtLink>
       </nav>
+
+      <div
+        v-if="isDemo"
+        class="rounded-lg border border-secondary bg-secondary/5 px-4 py-2 text-sm text-secondary"
+      >
+        Режим демо (только просмотр). Для полного доступа откройте без параметра ?demo=1
+      </div>
 
       <header class="space-y-3">
         <h1 class="text-[32px] font-bold leading-tight tracking-[-0.01em] text-primary">
@@ -236,6 +270,86 @@ onUnmounted(() => {
             </div>
           </section>
 
+          <section
+            v-if="idea.funnelStage === 'decision' && !isDemo"
+            class="space-y-4 rounded-2xl border border-secondary bg-secondary/5 p-6"
+            aria-labelledby="mvp-heading"
+          >
+            <h2
+              id="mvp-heading"
+              class="text-lg font-bold text-secondary"
+            >
+              MVP: Тест обращения
+            </h2>
+            <p class="text-sm text-muted-foreground">
+              Введите текст обращения клиента — система классифицирует его и проверит правилами.
+            </p>
+            <form
+              class="space-y-3"
+              @submit.prevent="submitMvp"
+            >
+              <textarea
+                v-model="ticketText"
+                class="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                rows="3"
+                placeholder="Здравствуйте, у меня не работает оплата на сайте..."
+                aria-label="Текст обращения клиента"
+              />
+              <button
+                type="submit"
+                :disabled="mvpBusy || !ticketText.trim()"
+                class="inline-flex h-10 items-center justify-center rounded-full bg-secondary px-5 text-sm font-medium text-on-secondary hover:bg-secondary/90 disabled:opacity-50"
+              >
+                {{ mvpBusy ? 'Обработка...' : 'Проверить обращение' }}
+              </button>
+            </form>
+            <p
+              v-if="mvpError"
+              class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+              role="alert"
+            >
+              {{ mvpError }}
+            </p>
+            <div
+              v-if="mvpResult"
+              class="space-y-3 rounded-lg border bg-card p-4 text-sm"
+            >
+              <div class="flex items-center gap-2">
+                <span
+                  :class="mvpResult.validated ? 'bg-success-soft text-success' : 'bg-destructive/10 text-destructive'"
+                  class="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                >
+                  {{ mvpResult.validated ? 'Пройдено' : 'Ошибка' }}
+                </span>
+                <span class="font-medium">Классификация</span>
+              </div>
+              <dl
+                v-if="mvpResult.classification"
+                class="grid gap-1 sm:grid-cols-[140px_1fr]"
+              >
+                <div
+                  v-for="(value, key) in mvpResult.classification as Record<string, unknown>"
+                  :key="key"
+                  class="contents"
+                >
+                  <dt class="text-muted-foreground">{{ key }}</dt>
+                  <dd>{{ typeof value === 'string' ? value : JSON.stringify(value) }}</dd>
+                </div>
+              </dl>
+              <ul
+                v-if="mvpResult.errors?.length"
+                class="list-disc pl-5 text-destructive"
+              >
+                <li
+                  v-for="(err, idx) in mvpResult.errors"
+                  :key="idx"
+                >
+                  {{ err }}
+                </li>
+              </ul>
+            </div>
+          </section>
+
           <div class="flex flex-wrap gap-3">
             <NuxtLink
               :to="`/ideas/${idea.id}/report`"
@@ -256,6 +370,7 @@ onUnmounted(() => {
           <JobProgress
             :busy="busy"
             :job="job"
+            :readonly="isDemo"
             @cancel="jobAction('cancel')"
             @pause="jobAction('pause')"
             @rerun="runAnalysis"

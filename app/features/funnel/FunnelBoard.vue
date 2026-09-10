@@ -3,6 +3,9 @@ import type { IdeaSummary } from '../ideas/types'
 
 import { extractApiMessage, FUNNEL_LABELS, FUNNEL_STAGES, PRIORITY_LABELS } from '../ideas/types'
 
+const route = useRoute()
+const isDemo = computed(() => route.query.demo === '1')
+
 const { error, ideas, pending, refresh } = useIdeas()
 
 const stageFilter = ref<string>('all')
@@ -240,7 +243,10 @@ const emptyText = computed(() =>
               <span class="text-xs text-muted-foreground">v{{ idea.version }}</span>
             </div>
           </div>
-          <div class="flex shrink-0 flex-wrap gap-2">
+          <div
+            v-if="!isDemo"
+            class="flex shrink-0 flex-wrap gap-2"
+          >
             <button
               v-if="idea.funnelStage !== 'mvp_ready'"
               type="button"

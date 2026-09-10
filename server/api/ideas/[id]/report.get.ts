@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const ideaId = parseUuid(getRouterParam(event, 'id'))
 
   const report = await db.orm.public.Reports
-    .where(f => f.ideaId.eq(ideaId))
+    .where(f => f.ideaId.eq(ideaId).and(f.outdated.eq(false)))
     .orderBy(f => f.version.desc())
     .first()
 

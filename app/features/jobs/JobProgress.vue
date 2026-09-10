@@ -6,6 +6,7 @@ import { JOB_STATUS_LABELS } from './types'
 const props = defineProps<{
   busy: boolean
   job: JobSummary | null
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -55,6 +56,7 @@ const isRunning = computed(() =>
     >
       Анализ ещё не запускался.
       <button
+        v-if="!readonly"
         type="button"
         class="font-medium text-primary underline"
         @click="emit('run')"
@@ -105,7 +107,10 @@ const isRunning = computed(() =>
         {{ job.error }}
       </p>
 
-      <div class="flex flex-wrap gap-2 pt-1">
+      <div
+        v-if="!readonly"
+        class="flex flex-wrap gap-2 pt-1"
+      >
         <button
           v-if="job.status === 'running'"
           type="button"

@@ -32,18 +32,12 @@ export const ideaAnalystRole = {
 «${transcript}»
 
 Заполни все поля:
-- title: краткое название (1 фраза)
-- problem: какую проблему решает
-- audience: кому адресована
-- value: какую ценность даёт
-- constraints: ограничения
-- assumptions: допущения
-- successMetrics: как измерить успех
-- sourceTranscript: исходный текст`,
+Верни СТРОГО JSON ровно в таком формате (без markdown, без пояснений):
+{"title":"краткое название","problem":"какую проблему решает (10-500 симв.)","audience":"кому адресована","value":"какую ценность даёт","constraints":["ограничение 1"],"assumptions":["допущение 1"],"successMetrics":["метрика 1"],"sourceTranscript":"исходный текст без изменений"}`,
 
   schema: StructuredIdeaSchema as unknown as StructuredIdea,
-  temperature: 0.3,
-  maxTokens: 2048,
-  timeoutMs: 60_000,
+  temperature: 0.15,
+  maxTokens: 3072,
+  timeoutMs: 300_000,
   retries: 1,
 }
