@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Priority } from '~~/shared/schemas'
+import VoiceRecorder from '~~/app/features/voice-input/VoiceRecorder.vue'
 
 const transcript = ref('')
 const priority = ref<Priority>('medium')
