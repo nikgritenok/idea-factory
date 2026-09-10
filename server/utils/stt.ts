@@ -1,3 +1,11 @@
+import { execFile } from 'node:child_process'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+
 const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
 export const STT_MODEL = 'microsoft/mai-transcribe-2'
 
@@ -16,6 +24,32 @@ export class SttError extends Error {
   }
 }
 
+async function convertWebmToWav(inputBuffer: Buffer): Promise<Buffer> {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'stt-'))
+  const inputPath = join(tmpDir, 'input.webm')
+  const outputPath = join(tmpDir, 'output.wav')
+
+  try {
+    await writeFile(inputPath, inputBuffer)
+    await execFileAsync('ffmpeg', [
+      '-i', inputPath,
+      '-ar', '16000',
+      '-ac', '1',
+      '-sample_fmt', 's16',
+      '-f', 'wav',
+      '-y',
+      outputPath,
+    ], { timeout: 30_000 })
+    return await readFile(outputPath)
+  }
+  catch {
+    throw new SttError('Не удалось обработать аудио', 500)
+  }
+  finally {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
 export async function transcribeAudio(
   file: Blob,
   filename: string,
@@ -25,8 +59,16 @@ export async function transcribeAudio(
     throw new SttError('STT-ключ не настроен на сервере', 503)
   }
 
+  let sendBuffer = Buffer.from(await file.arrayBuffer())
+  let sendFilename = filename
+
+  if (file.type.includes('webm')) {
+    sendBuffer = await convertWebmToWav(sendBuffer)
+    sendFilename = filename.replace(/\.webm$/i, '.wav')
+  }
+
   const form = new FormData()
-  form.append('file', file, filename)
+  form.append('file', new Blob([sendBuffer], { type: 'audio/wav' }), sendFilename)
   form.append('model', STT_MODEL)
   form.append('language', 'ru')
 

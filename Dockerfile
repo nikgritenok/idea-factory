@@ -27,10 +27,11 @@ CMD ["sh", "-c", "pnpm prisma db update --confirm idea_factory && pnpm prisma db
 
 # ---- runtime ----
 FROM node:24-alpine AS runtime
-RUN addgroup -g 1001 -S app && adduser -S app -u 1001 -G app
+RUN apk add --no-cache ffmpeg && addgroup -g 1001 -S app && adduser -S app -u 1001 -G app
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build --chown=app:app /app/.output ./.output
+COPY --from=deps --chown=app:app /app/node_modules ./node_modules
 USER app
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]
