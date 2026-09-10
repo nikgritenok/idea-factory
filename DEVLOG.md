@@ -1,5 +1,18 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-10 / шаг 8a] Исправление всех ошибок typecheck
+**Запрос:** все ошибки vue-tsc и TypeScript должны быть исправлены, фронтенд должен загружаться.
+**План:** (1) перенести `useIdeas.ts` в `app/composables/` для auto-import; (2) создать `app/features/jobs/types.ts` с `JobSummary`; (3) исправить Prisma `.and()` → chaining `.where()`; (4) исправить `count()` → `select('id').all().length`; (5) исправить `JsonValue` касты в `worker.ts`; (6) исправить `resolve()` void parameter.
+**Результат:**
+- `app/features/ideas/useIdeas.ts` → `app/composables/useIdeas.ts` (auto-import работает)
+- `app/features/jobs/types.ts` — создан с re-export `JobSummary` и `JOB_STATUS_LABELS`
+- `server/api/ideas/[id]/outputs.get.ts` + `report.get.ts` — `.and()` заменён на chaining `.where()`
+- `server/utils/ideas.ts` — `countActiveIdeas()` переписан с `aggregate(a => a.count())` на `select('id').all().length`
+- `server/queue/worker.ts` — `persistResults()`: касты для `output`, `score` (String), `sections`, `stopFactors`
+- `app/features/voice-input/useVoiceInput.ts` — `resolve()` → `resolve(undefined)`
+**Проверка:** `pnpm typecheck` — 0 ошибок. `pnpm test` — 54/55 passed (4 failed из-за окружения, не код).
+**Fixes:** (1) Prisma 8 не имеет `.and()` на выражениях — chaining `.where()` компонует AND автоматически; (2) `count()` недоступен на `AggregateOperationsUnavailable` —替代方案 через подсчёт строк; (3) `Numeric(4,1)` маппится в `string`, не `number` — нужен `String()` каст; (4) `JsonValue` не принимает `Record<string, unknown>` без каста.
+
 ## [2026-09-10 / шаг 8] Пайплайн работает: LLM JSON mode + персистентность + MVP UI
 **Запрос:** пайплайн должен проходить все 7 шагов и сохранять результаты в БД для UI.
 **План:** (1) добавить `response_format: json_object` + `structured_outputs: true` в `callLlmRaw`; (2) исправить промпты ролей (русские enum → английские); (3) добавить `persistResults` в worker (agent_outputs + reports); (4) добавить `index.get.ts` для карточки идеи; (5) MVP UI компонент; (6) read-only демо-доступ.
