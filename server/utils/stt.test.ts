@@ -37,8 +37,8 @@ describe('transcribeAudio — контракт routerai STT', () => {
     it('вызывает ffmpeg с нужными аргументами', async () => {
       process.env.ROUTERAI_API_KEY = 'test-key'
       mockExecFile.mockImplementation(
-        (cmd: string, args: unknown[], ...rest: unknown[]) => {
-          const cb = rest[rest.length - 1] as (err: Error | null) => void
+        (...args: unknown[]) => {
+          const cb = args[args.length - 1] as (err: Error | null) => void
           cb(null)
           return {} as any
         },
@@ -54,7 +54,7 @@ describe('transcribeAudio — контракт routerai STT', () => {
       }
 
       expect(mockExecFile).toHaveBeenCalledOnce()
-      const ffmpegArgs = mockExecFile.mock.calls[0][1] as string[]
+      const ffmpegArgs = mockExecFile.mock.calls[0]![1] as string[]
       expect(ffmpegArgs).toContain('-ar')
       expect(ffmpegArgs).toContain('16000')
       expect(ffmpegArgs).toContain('-ac')
@@ -66,8 +66,8 @@ describe('transcribeAudio — контракт routerai STT', () => {
     it('tmpdir удаляется при ошибке ffmpeg', async () => {
       process.env.ROUTERAI_API_KEY = 'test-key'
       mockExecFile.mockImplementation(
-        (cmd: string, args: unknown[], ...rest: unknown[]) => {
-          const cb = rest[rest.length - 1] as (err: Error | null) => void
+        (...args: unknown[]) => {
+          const cb = args[args.length - 1] as (err: Error | null) => void
           cb(new Error('ffmpeg not found'))
           return {} as any
         },

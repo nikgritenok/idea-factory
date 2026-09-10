@@ -40,7 +40,7 @@ async function convertWebmToWav(inputBuffer: Buffer): Promise<Buffer> {
       '-y',
       outputPath,
     ], { timeout: 30_000 })
-    return await readFile(outputPath)
+    return Buffer.from(await readFile(outputPath))
   }
   catch {
     throw new SttError('Не удалось обработать аудио', 500)
