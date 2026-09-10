@@ -24,7 +24,7 @@ export class SttError extends Error {
   }
 }
 
-async function convertWebmToWav(inputBuffer: Buffer): Promise<Buffer> {
+async function convertWebmToWav(inputBuffer: Buffer): Promise<Buffer<ArrayBuffer>> {
   const tmpDir = await mkdtemp(join(tmpdir(), 'stt-'))
   const inputPath = join(tmpDir, 'input.webm')
   const outputPath = join(tmpDir, 'output.wav')
@@ -40,7 +40,8 @@ async function convertWebmToWav(inputBuffer: Buffer): Promise<Buffer> {
       '-y',
       outputPath,
     ], { timeout: 30_000 })
-    return Buffer.from(await readFile(outputPath))
+    const result = await readFile(outputPath)
+    return Buffer.from(result) as Buffer<ArrayBuffer>
   }
   catch {
     throw new SttError('Не удалось обработать аудио', 500)
