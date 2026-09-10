@@ -267,7 +267,7 @@ export class AnalysisWorker {
         await this.db.orm.public.AgentOutputs.create({
           ideaId,
           formatValid: true,
-          output: result,
+          output: result as Record<string, unknown>,
           role: step.role ?? step.id,
           runId: runId ?? null,
         })
@@ -293,9 +293,9 @@ export class AnalysisWorker {
         await this.db.orm.public.Reports.create({
           ideaId,
           recommendation: rec.recommendation ?? null,
-          score: rec.overallScore ?? rec.score ?? null,
-          sections: nested,
-          stopFactors: rec.stopFactors ?? [],
+          score: String(rec.overallScore ?? rec.score ?? null),
+          sections: nested as Record<string, unknown>,
+          stopFactors: (rec.stopFactors ?? []) as unknown[],
           version: nextVersion,
         })
       }

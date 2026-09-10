@@ -11,8 +11,9 @@ export function titleFromTranscript(transcript: string): string {
 }
 
 export async function countActiveIdeas(): Promise<number> {
-  const result = await db.orm.public.Ideas
+  const rows = await db.orm.public.Ideas
     .where(f => f.funnelStage.neq('archived'))
-    .aggregate(a => ({ n: a.count() }))
-  return result.n
+    .select('id')
+    .all()
+  return rows.length
 }

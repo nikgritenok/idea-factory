@@ -49,7 +49,7 @@ export function useVoiceInput() {
   async function stop(): Promise<void> {
     await new Promise((resolve) => {
       if (!mediaRecorder || !recording.value) {
-        resolve()
+        resolve(undefined)
         return
       }
       mediaRecorder.onstop = () => {
@@ -59,7 +59,7 @@ export function useVoiceInput() {
         })
         if (timer) clearInterval(timer)
         recording.value = false
-        resolve()
+        resolve(undefined)
       }
       mediaRecorder.stop()
     })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { JobSummary } from '../jobs/JobProgress.vue'
+import type { JobSummary } from '../jobs/types'
 
 import { extractApiMessage } from './types'
 

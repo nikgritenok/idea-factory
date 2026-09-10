@@ -6,7 +6,8 @@ export default defineEventHandler(async (event) => {
   const ideaId = parseUuid(getRouterParam(event, 'id'))
 
   const rows = await db.orm.public.AgentOutputs
-    .where(f => f.ideaId.eq(ideaId).and(f.outdated.eq(false)))
+    .where(f => f.ideaId.eq(ideaId))
+    .where(f => f.outdated.eq(false))
     .orderBy(f => f.createdAt.desc())
     .limit(50)
     .all()
