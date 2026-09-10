@@ -6,4 +6,5 @@ useSeoMeta({ title: 'Карточка идеи — Фабрика идей' })
 
 <template>
   <IdeaCard />
+  <NuxtPage />
 </template>

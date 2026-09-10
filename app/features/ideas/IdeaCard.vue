@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { JobSummary } from '../jobs/types'
 
+import JobProgress from '../jobs/JobProgress.vue'
 import { extractApiMessage } from './types'
 
 const route = useRoute()
