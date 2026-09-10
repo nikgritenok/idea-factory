@@ -1,0 +1,17 @@
+node_modules
+.output
+.nuxt
+.git
+.github
+*.md
+!README.md
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+coverage
+test-results
+playwright-report
+dist
+.vite

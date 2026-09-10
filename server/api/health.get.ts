@@ -3,7 +3,6 @@ import { db } from '~~/server/utils/db'
 // GET /api/health — healthcheck endpoint для Docker и Caddy
 export default defineEventHandler(async () => {
   try {
-    // Простой запрос через ORM — проверяем соединение с БД
     await db.orm.public.Ideas.select('id').limit(1).all()
     return {
       db: 'ok',
@@ -11,7 +10,8 @@ export default defineEventHandler(async () => {
       timestamp: new Date().toISOString(),
     }
   }
-  catch {
+  catch (error) {
+    console.error('[health] DB check failed:', error)
     throw createError({
       statusCode: 503,
       statusMessage: 'Database unreachable',
