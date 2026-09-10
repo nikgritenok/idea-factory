@@ -1,5 +1,20 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-10 / шаг 8b] Исправление runtime ошибок и компонентов
+**Запрос:** фронтенд должен загружаться без ошибок в консоли.
+**План:** (1) добавить явный импорт `JobProgress` в `IdeaCard.vue`; (2) добавить `<NuxtPage />` в `[id].vue` для вложенных маршрутов; (3) исправить все `new Date()` → `.toISOString()` в серверном коде; (4) исправить `JsonValue` касты через `as any`; (5) исправить `ensureMigrated` (не существует); (6) исправить `addEdge` типы; (7) исправить `DatasetParams` литералы; (8) исправить тесты.
+**Результат:**
+- `app/features/ideas/IdeaCard.vue` — добавлен `import JobProgress from '../jobs/JobProgress.vue'`
+- `app/pages/ideas/[id].vue` — добавлен `<NuxtPage />` для вложенных маршрутов
+- `server/queue/claim.ts`, `controls.ts`, `enqueue.ts`, `run-protocol.ts`, `worker.ts` — все `new Date()` → `.toISOString()`
+- `server/queue/run-protocol.ts`, `calc-executor.ts`, `validator-client.ts` — `JsonValue` касты через `as any`
+- `server/plugins/worker.ts` — удалён `ensureMigrated` (не существует в `db.ts`)
+- `server/queue/worker.ts` — `addEdge` касты `'__start__'` вместо `string`
+- `server/utils/efficiency/dataset.ts` — `DatasetParams` тип: `{ [K in keyof ...]: number }`
+- Тесты: добавлен `db` в контекст, исправлен `split()` safety
+**Проверка:** `pnpm typecheck` — 0 ошибок. `vue-tsc --noEmit` — 0 ошибок. Dev сервер отдаёт HTML.
+**Fixes:** (1) Компоненты в `app/features/` не auto-importятся — нужен явный импорт; (2) Вложенные маршруты требуют `<NuxtPage />` в родительском компоненте; (3) Prisma `TimestamptzString` ожидает `string`, не `Date`; (4) `JsonValue` не принимает `Record<string, unknown>` — нужен `as any` каст.
+
 ## [2026-09-10 / шаг 8a] Исправление всех ошибок typecheck
 **Запрос:** все ошибки vue-tsc и TypeScript должны быть исправлены, фронтенд должен загружаться.
 **План:** (1) перенести `useIdeas.ts` в `app/composables/` для auto-import; (2) создать `app/features/jobs/types.ts` с `JobSummary`; (3) исправить Prisma `.and()` → chaining `.where()`; (4) исправить `count()` → `select('id').all().length`; (5) исправить `JsonValue` касты в `worker.ts`; (6) исправить `resolve()` void parameter.
