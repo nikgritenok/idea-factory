@@ -67,6 +67,19 @@ pnpm worker                 # Start the queue worker
 pnpm lint && pnpm typecheck && pnpm test
 ```
 
+## Deploy to production (VPS — always from this machine!)
+
+```bash
+# NEVER use --no-cache — it reinstalls all deps from scratch (~5 min).
+# Always use cache (default) — rebuilds only changed layers (~30s).
+cd /root/projects/idea-factory
+git pull
+docker compose -f docker-compose.prod.yml build web    # WITH cache!
+docker compose -f docker-compose.prod.yml up -d web
+```
+
+The VPS is this machine. Do NOT use SSH to connect elsewhere.
+
 ## Auto-formatting on commit
 
 Husky + lint-staged run `eslint --fix` (including stylistic rules via `stylistic: true` in `nuxt.config.ts`) on staged `*.{ts,vue,mjs}` files before every commit. Write code however is comfortable — it will be formatted automatically at commit time.
