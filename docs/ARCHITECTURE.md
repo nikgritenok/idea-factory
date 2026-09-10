@@ -207,6 +207,45 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 - **Хранение**: таблица `calculations` (model_version, formula, params, seed, input_summary, result, warnings)
 - **Воспроизводимость**: тот же вход + seed → битово идентичный результат (тест `compute.test.ts`)
 
+## Деплой (продакшен)
+
+| Компонент | Технология | Описание |
+|-----------|-----------|----------|
+| Reverse proxy | Caddy | TLS termination, `idea-factory.nikgretenok.online` → `127.0.0.1:3000` |
+| App server | Docker (node:24-alpine) | Multi-stage build, non-root user, standalone Nitro output |
+| Worker | Docker (тот же образ) | `WORKER_MODE=true`, обработка очереди |
+| Database | Docker (postgres:16-alpine) | Порт 5433:5432, healthcheck, persistent volume |
+| Миграции | Docker (one-shot) | `docker compose --profile setup run --rm migrate` |
+
+### Архитектура контейнеров
+
+```
+idea-factory-web-1      → 127.0.0.1:3000 (Nuxt SSR + API)
+idea-factory-worker-1   → queue processing (WORKER_MODE=true)
+idea-factory-db-1       → 127.0.0.1:5433 (PostgreSQL 16)
+Caddy                   → 443 → 3000 (TLS + reverse proxy)
+```
+
+### Команды деплоя
+
+```bash
+# Первый запуск
+docker compose -f docker-compose.prod.yml up -d db
+docker compose -f docker-compose.prod.yml --profile setup run --rm migrate
+docker compose -f docker-compose.prod.yml up -d web worker
+
+# Обновление
+docker compose -f docker-compose.prod.yml build web worker
+docker compose -f docker-compose.prod.yml up -d --force-recreate web worker
+
+# Проверка здоровья
+curl https://idea-factory.nikgretenok.online/api/health
+```
+
+### Healthcheck
+
+`GET /api/health` → `{ db: "ok", status: "healthy", timestamp: "..." }` или 503.
+
 ## Версионирование API
 
 Стратегия: **версионирование через URL** (фаза 2+).

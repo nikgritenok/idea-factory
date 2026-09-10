@@ -1,5 +1,22 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-10 / шаг 9] Инфраструктура и деплой (CI/CD + Docker)
+**Запрос:** настроить продакшен-инфраструктуру — Docker multi-stage, docker-compose.prod.yml, healthcheck, миграции, деплой.
+**План:** (1) healthcheck endpoint; (2) Dockerfile multi-stage + non-root; (3) docker-compose.prod.yml; (4) .dockerignore; (5) деплой + smoke test; (6) ARCHITECTURE.md.
+**Результат:**
+- `server/api/health.get.ts` — `GET /api/health` проверяет БД через ORM, возвращает `{db, status, timestamp}` или 503
+- `Dockerfile` — 4 стадии: deps → build → migrate → runtime. Non-root user (app:1001), standalone Nitro output, нет node_modules в runtime
+- `docker-compose.prod.yml` — 4 сервиса: db (postgres:16-alpine, healthcheck), web (NITRO_PORT=3000, healthcheck), worker (WORKER_MODE=true), migrate (profiles=setup, one-shot)
+- `.dockerignore` — исключает node_modules, .output, .git, .env (контекст: 1.8GB → 30KB)
+- `.env.example` — обновлён со всеми переменными окружения
+- Образ: 260MB (было ~800MB+)
+**Проверка:** `docker compose up -d` → все 3 сервиса healthy. `curl /api/health` → `{db: "ok"}`. Сайт `https://idea-factory.nikgretenok.online` → 200. `curl /api/ideas` → данные.
+**Fixes:**
+- `db.raw.sql` syntax для Prisma 8 healthcheck — заменён на `db.orm.public.Ideas.select('id').limit(1).all()`
+- `postgresql://` scheme required для pg driver в Docker (не `postgres://`)
+- Password auth failed при повторном использовании volume — `ALTER USER postgres PASSWORD`_needed after volume reuse
+- `.dockerignore` обязателен — без него контекст 1.8GB, билд ~5 минут
+
 ## [2026-09-10 / шаг 8c] Исправление продакшен-билда (502 Bad Gateway)
 **Запрос:** сайт на продакшене не открывается (502 Bad Gateway).
 **План:** проверить билд, найти ошибку Nitro, исправить импорт.
