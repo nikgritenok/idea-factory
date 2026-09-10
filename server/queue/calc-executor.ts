@@ -24,12 +24,16 @@ export const calcExecutor = async (ctx: StepContext): Promise<StepResult> => {
   await ctx.db.orm.public.Calculations.create({
     formula: output.result.formula.join('; '),
     ideaId: ctx.ideaId,
-    inputSummary: output.inputSummary,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    inputSummary: output.inputSummary as any,
     modelVersion: output.result.modelVersion,
-    params: JSON.parse(JSON.stringify(output.result.mainVariant)),
-    result: JSON.parse(JSON.stringify({ decision: output.decision, result: output.result })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    params: JSON.parse(JSON.stringify(output.result.mainVariant)) as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result: JSON.parse(JSON.stringify({ decision: output.decision, result: output.result })) as any,
     seed: BigInt(output.seed),
-    warnings: JSON.parse(JSON.stringify(output.result.warnings)),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    warnings: JSON.parse(JSON.stringify(output.result.warnings)) as any,
   })
 
   return {

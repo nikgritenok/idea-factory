@@ -61,8 +61,10 @@ export async function recordRunCall(
       durationMs: call.durationMs,
       error: call.error ?? null,
       ok: call.ok,
-      request: call.request as Record<string, unknown>,
-      response: call.response as Record<string, unknown>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      request: call.request as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      response: call.response as any,
       runId,
     })
   return row.id
