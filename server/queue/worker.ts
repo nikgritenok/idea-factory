@@ -15,7 +15,7 @@ const PipelineState = Annotation.Root({
   jobId: Annotation<string>,
   pipelineVersion: Annotation<string>,
   runId: Annotation<string | undefined>({
-    default: () => undefined,
+    default: () => {},
     reducer: (a, b) => b ?? a,
   }),
   stepResults: Annotation<Record<string, unknown>>({
@@ -228,14 +228,14 @@ export class AnalysisWorker {
       await finishRun(runId, 'completed')
     }
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(job.id))
+      .where(f => f.id.eq(job.id))
       .update({
-        status: 'done',
-        finishedAt: new Date(),
         checkpoint: { ...cp, graph_started: true, last_step: completedStep } satisfies JobCheckpoint,
+        finishedAt: new Date(),
+        status: 'done',
       })
     await this.db.orm.public.Ideas
-      .where((f) => f.id.eq(job.ideaId))
+      .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
         updatedAt: new Date(),
@@ -272,14 +272,14 @@ export class AnalysisWorker {
 
     const lastStep = this.opts.steps.at(-1)?.id ?? null
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(job.id))
+      .where(f => f.id.eq(job.id))
       .update({
-        status: 'done',
-        finishedAt: new Date(),
         checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
+        finishedAt: new Date(),
+        status: 'done',
       })
     await this.db.orm.public.Ideas
-      .where((f) => f.id.eq(job.ideaId))
+      .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
         updatedAt: new Date(),
@@ -307,10 +307,10 @@ export class AnalysisWorker {
     return async (state: PipelineStateT): Promise<Pick<PipelineStateT, 'stepResults'>> => {
       const output = await runWithRetry(
         async () => await exec({
+          db: this.db,
           ideaId: state.ideaId,
           jobId: state.jobId,
           signal: this.currentSignal ?? new AbortController().signal,
-          db: this.db,
           state: state.stepResults,
           step,
         }),
@@ -328,7 +328,7 @@ export class AnalysisWorker {
   private async readStatus(jobId: string): Promise<JobRow['status'] | undefined> {
     const row = await this.db.orm.public.QueueJobs
       .select('status')
-      .where((f) => f.id.eq(jobId))
+      .where(f => f.id.eq(jobId))
       .first()
     return (row as { status: JobRow['status'] } | undefined)?.status
   }
@@ -341,16 +341,16 @@ export class AnalysisWorker {
   ): Promise<void> {
     const nextCp = { ...cp, graph_started: true, last_step: stepId } satisfies JobCheckpoint
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(jobId))
+      .where(f => f.id.eq(jobId))
       .update({
-        currentStep: stepId,
         checkpoint: nextCp,
+        currentStep: stepId,
       })
 
     // Обновляем идею: стадия + execution_status
     const job = await this.db.orm.public.QueueJobs
       .select('ideaId')
-      .where((f) => f.id.eq(jobId))
+      .where(f => f.id.eq(jobId))
       .first()
     if (job) {
       const updateData: { funnelStage?: string, executionStatus: string, updatedAt: Date } = {
@@ -361,20 +361,20 @@ export class AnalysisWorker {
         updateData.funnelStage = funnelStageAfter
       }
       await this.db.orm.public.Ideas
-        .where((f) => f.id.eq(job.ideaId))
+        .where(f => f.id.eq(job.ideaId))
         .update(updateData)
     }
   }
 
   private async markPaused(job: JobRow, cp: JobCheckpoint): Promise<void> {
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(job.id))
+      .where(f => f.id.eq(job.id))
       .update({
-        status: 'paused',
         checkpoint: cp,
+        status: 'paused',
       })
     await this.db.orm.public.Ideas
-      .where((f) => f.id.eq(job.ideaId))
+      .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
         updatedAt: new Date(),
@@ -383,13 +383,13 @@ export class AnalysisWorker {
 
   private async markCancelled(job: JobRow): Promise<void> {
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(job.id))
+      .where(f => f.id.eq(job.id))
       .update({
-        status: 'cancelled',
         finishedAt: new Date(),
+        status: 'cancelled',
       })
     await this.db.orm.public.Ideas
-      .where((f) => f.id.eq(job.ideaId))
+      .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
         updatedAt: new Date(),
@@ -404,15 +404,15 @@ export class AnalysisWorker {
   ): Promise<void> {
     const message = error instanceof Error ? error.message : String(error)
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(job.id))
+      .where(f => f.id.eq(job.id))
       .update({
-        status: 'failed',
-        finishedAt: new Date(),
-        error: message,
         checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
+        error: message,
+        finishedAt: new Date(),
+        status: 'failed',
       })
     await this.db.orm.public.Ideas
-      .where((f) => f.id.eq(job.ideaId))
+      .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'error',
         updatedAt: new Date(),
@@ -426,19 +426,19 @@ export class AnalysisWorker {
       componentVersions[step.role] = isFixture ? 'fixture' : 'z-ai/glm-5.3-flash'
     }
 
-    return createRun({
-      ideaId: job.ideaId,
-      variant: isFixture ? 'fixture' : 'llm',
+    return await createRun({
       componentVersions,
       configVersion: PIPELINE_VERSION,
+      ideaId: job.ideaId,
       isFixture,
+      variant: isFixture ? 'fixture' : 'llm',
     })
   }
 
   private async clearRewind(jobId: string, cp: JobCheckpoint): Promise<void> {
     const nextCp = { ...cp, rewind_to_step: null } satisfies JobCheckpoint
     await this.db.orm.public.QueueJobs
-      .where((f) => f.id.eq(jobId))
+      .where(f => f.id.eq(jobId))
       .update({ checkpoint: nextCp })
   }
 }

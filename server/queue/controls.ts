@@ -14,7 +14,7 @@ export class QueueControlError extends Error {
 
 async function getJob(db: PrismaDb, jobId: string): Promise<JobRow> {
   const job = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .first()
   if (!job) {
     throw new QueueControlError(`Задача не найдена: ${jobId}`, 404)
@@ -33,13 +33,13 @@ export async function pauseJob(db: PrismaDb, jobId: string): Promise<JobRow> {
   }
   const cp: JobCheckpoint = job.checkpoint ?? initialCheckpoint(jobId)
   const updated = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .update({
-      status: 'paused',
       checkpoint: { ...cp, graph_started: job.checkpoint?.graph_started ?? false },
+      status: 'paused',
     })
   await db.orm.public.Ideas
-    .where((f) => f.id.eq(job.ideaId))
+    .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
       updatedAt: new Date(),
@@ -57,10 +57,10 @@ export async function resumeJob(db: PrismaDb, jobId: string): Promise<JobRow> {
     throw new QueueControlError(`Задачу в статусе «${job.status}» нельзя продолжить`, 409)
   }
   const updated = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .update({ status: 'queued' })
   await db.orm.public.Ideas
-    .where((f) => f.id.eq(job.ideaId))
+    .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
       updatedAt: new Date(),
@@ -75,13 +75,13 @@ export async function cancelJob(db: PrismaDb, jobId: string): Promise<JobRow> {
     return job
   }
   const updated = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .update({
-      status: 'cancelled',
       finishedAt: new Date(),
+      status: 'cancelled',
     })
   await db.orm.public.Ideas
-    .where((f) => f.id.eq(job.ideaId))
+    .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
       updatedAt: new Date(),
@@ -116,15 +116,15 @@ export async function retryStep(
 
   const nextCp: JobCheckpoint = { ...cp, rewind_to_step: target }
   const updated = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .update({
-      status: 'queued',
+      checkpoint: nextCp,
       error: null,
       finishedAt: null,
-      checkpoint: nextCp,
+      status: 'queued',
     })
   await db.orm.public.Ideas
-    .where((f) => f.id.eq(job.ideaId))
+    .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
       updatedAt: new Date(),
@@ -139,10 +139,10 @@ export async function setJobPriority(db: PrismaDb, jobId: string, priority: Queu
     throw new QueueControlError(`Задача в статусе «${job.status}» — приоритет менять нечего`, 409)
   }
   const updated = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .update({ priority })
   await db.orm.public.Ideas
-    .where((f) => f.id.eq(job.ideaId))
+    .where(f => f.id.eq(job.ideaId))
     .update({
       priority,
       updatedAt: new Date(),

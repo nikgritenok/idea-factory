@@ -254,10 +254,14 @@ export default withNuxt(
 
   {
     files: ['**/*.{ts,vue}'],
+    ignores: ['nuxt.config.ts'],
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['config/*.ts', 'playwright.config.ts', 'e2e/*.ts'],
+          allowDefaultProject: ['config/*.ts', 'playwright.config.ts', 'e2e/*.ts', 'vitest.config.ts', 'src/prisma/*.ts'],
+          // Nuxt solution-style tsconfig: app-файлы типизируются через .nuxt/tsconfig.app.json,
+          // server-файлы — через .nuxt/tsconfig.server.json (root tsconfig.json имеет files: [])
+          defaultProject: '.nuxt/tsconfig.app.json',
         },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.vue'],
@@ -303,6 +307,23 @@ export default withNuxt(
     },
   },
 
+  // Vue SFC: автоимпорты Nuxt (ref/computed/useFetch) не типизируются type-aware
+  // парсером (solution-style tsconfig), поэтому strict type-правила с false
+  // positive'ами отключены для .vue. Истинная типизация — vue-tsc в pnpm typecheck.
+  {
+    files: ['**/*.vue'],
+    rules: {
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-redundant-type-constituents': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
+    },
+  },
+
   {
     files: ['**/*.{ts,vue,mjs}'],
     rules: {
@@ -334,6 +355,15 @@ export default withNuxt(
   ...vuejsAccessibility.configs['flat/recommended'].map(config => ({
     ...config,
     files: ['**/*.vue'],
+    rules: {
+      ...config.rules,
+      // label с for+id вне label — валидный паттерн (a11y корректен)
+      'vuejs-accessibility/label-has-for': ['error', {
+        components: [],
+        controlComponents: [],
+        required: { some: ['nesting', 'id'] },
+      }],
+    },
   })),
 
   {

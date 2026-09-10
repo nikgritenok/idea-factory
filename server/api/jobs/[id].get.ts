@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
 
   const job = await db.orm.public.QueueJobs
-    .where((f) => f.id.eq(jobId))
+    .where(f => f.id.eq(jobId))
     .first()
   if (!job) {
     throw createError({ statusCode: 404, statusMessage: 'Задача не найдена' })
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   const idea = await db.orm.public.Ideas
     .select('id', 'title', 'funnelStage', 'executionStatus')
-    .where((f) => f.id.eq(job.ideaId))
+    .where(f => f.id.eq(job.ideaId))
     .first()
 
   return {

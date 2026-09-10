@@ -6,29 +6,29 @@ import { db } from '../utils/db'
  */
 
 export interface ComparisonVariant {
+  label: string
   runId: string
   variant: string
-  label: string
 }
 
 export interface ComparisonResult {
-  variants: ComparisonVariant[]
+  confidence: 'high' | 'low' | 'medium'
   metrics: ComparisonMetrics
-  winner: string | null
-  confidence: 'low' | 'medium' | 'high'
+  variants: ComparisonVariant[]
+  winner: null | string
 }
 
 export interface ComparisonMetrics {
   /** Среднее время выполнения (мс) */
   avgDurationMs: number
-  /** Общая стоимость (₽) */
-  totalCost: number
-  /** Доля успешных вызовов */
-  successRate: number
-  /** Количество ошибок */
-  errorCount: number
   /** Среднее количество токенов */
   avgTokens: number
+  /** Количество ошибок */
+  errorCount: number
+  /** Доля успешных вызовов */
+  successRate: number
+  /** Общая стоимость (₽) */
+  totalCost: number
 }
 
 /**
@@ -44,20 +44,20 @@ export async function compareRuns(
   ])
 
   const variant1: ComparisonVariant = {
+    label: `Вариант 1 (${runId1.slice(0, 8)})`,
     runId: runId1,
     variant: 'variant_1',
-    label: `Вариант 1 (${runId1.slice(0, 8)})`,
   }
 
   const variant2: ComparisonVariant = {
+    label: `Вариант 2 (${runId2.slice(0, 8)})`,
     runId: runId2,
     variant: 'variant_2',
-    label: `Вариант 2 (${runId2.slice(0, 8)})`,
   }
 
   // Определяем победителя по success rate и среднему времени
-  let winner: string | null = null
-  let confidence: 'low' | 'medium' | 'high' = 'low'
+  let winner: null | string = null
+  let confidence: 'high' | 'low' | 'medium' = 'low'
 
   if (metrics1.successRate > metrics2.successRate) {
     winner = variant1.variant
@@ -77,20 +77,20 @@ export async function compareRuns(
   }
 
   return {
+    confidence,
     metrics: {
       avgDurationMs: (metrics1.avgDurationMs + metrics2.avgDurationMs) / 2,
-      totalCost: metrics1.totalCost + metrics2.totalCost,
-      successRate: (metrics1.successRate + metrics2.successRate) / 2,
-      errorCount: metrics1.errorCount + metrics2.errorCount,
       avgTokens: (metrics1.avgTokens + metrics2.avgTokens) / 2,
+      errorCount: metrics1.errorCount + metrics2.errorCount,
+      successRate: (metrics1.successRate + metrics2.successRate) / 2,
+      totalCost: metrics1.totalCost + metrics2.totalCost,
     },
     variants: [variant1, variant2],
     winner,
-    confidence,
   }
 }
 
-interface RunCallRow { durationMs: number | null, ok: boolean, response: unknown }
+interface RunCallRow { durationMs: null | number, ok: boolean, response: unknown }
 
 /**
  * Получает метрики одного прогона из run_calls.
@@ -100,7 +100,7 @@ async function getRunMetrics(
 ): Promise<ComparisonMetrics> {
   const calls = await db.orm.public.RunCalls
     .select('durationMs', 'ok', 'response')
-    .where((f) => f.runId.eq(runId))
+    .where(f => f.runId.eq(runId))
     .all() as unknown as RunCallRow[]
 
   const totalCalls = calls.length
@@ -116,10 +116,10 @@ async function getRunMetrics(
 
   return {
     avgDurationMs: totalCalls > 0 ? totalDuration / totalCalls : 0,
-    totalCost: 0, // routerai.ru не всегда возвращает стоимость
+    avgTokens: totalCalls > 0 ? totalTokens / totalCalls : 0,
     errorCount: totalCalls - successfulCalls,
     successRate: totalCalls > 0 ? successfulCalls / totalCalls : 0,
-    avgTokens: totalCalls > 0 ? totalTokens / totalCalls : 0,
+    totalCost: 0, // routerai.ru не всегда возвращает стоимость
   }
 }
 
@@ -131,14 +131,14 @@ export async function getRunsForIdea(
 ): Promise<Array<{ id: string, variant: string, status: string, startedAt: Date }>> {
   const runs = await db.orm.public.Runs
     .select('id', 'variant', 'status', 'startedAt')
-    .where((f) => f.ideaId.eq(ideaId))
-    .orderBy((f) => f.startedAt.desc())
+    .where(f => f.ideaId.eq(ideaId))
+    .orderBy(f => f.startedAt.desc())
     .all()
 
   return runs.map(r => ({
     id: r.id,
-    variant: r.variant,
-    status: r.status,
     startedAt: r.startedAt,
+    status: r.status,
+    variant: r.variant,
   }))
 }

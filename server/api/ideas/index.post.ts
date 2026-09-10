@@ -26,19 +26,19 @@ export default defineEventHandler(async (event) => {
       'createdAt', 'updatedAt', 'version',
     )
     .create({
-      title,
-      sourceTranscript: parsed.transcript,
-      sourceKind: parsed.source_kind,
-      priority: parsed.priority,
-      funnelStage: 'draft',
       executionStatus: 'paused',
+      funnelStage: 'draft',
+      priority: parsed.priority,
+      sourceKind: parsed.source_kind,
+      sourceTranscript: parsed.transcript,
+      title,
     })
 
   await db.orm.public.IdeaVersions.create({
-    ideaId: idea.id,
-    version: 1,
-    snapshot: idea,
     changedFields: { created: true },
+    ideaId: idea.id,
+    snapshot: idea,
+    version: 1,
   })
 
   setResponseStatus(event, 201)

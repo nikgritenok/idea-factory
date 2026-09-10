@@ -239,3 +239,4 @@ quality = ai_correct_rate; порог 0.85, цель ≥ 0.92
 - **Ключевое открытие:** Prisma 8 ORM требует namespace-qualified доступ: `db.orm.public.Ideas`, а не `db.orm.Ideas` (flat access не работает для contracts с namespace)
 **Проверка:** `npx vue-tsc --noEmit` — EXIT 0 (0 ошибок). `pnpm vitest run` — 55/55 business logic tests pass, 6 integration tests fail (test DB на порту 5434 недоступен — ожидаемо).
 **Fixes:** (1) `ormConfig` не существовал — исправлено на `ormConfig` из `@prisma/orm-postgres/config`; (2) DB миграция применена через `docker exec` (dbmate не работает с новым URL); (3) порт DB изменён на 5433 (5432 занят); (4) `contract infer` требовал пустую БД — миграция применена вручную; (5) `db.orm.Ideas` (flat) не работает — заменено на `db.orm.public.Ideas` (namespace-qualified)
+line: 2026-09-10 fix: добавлен import { z } from 'zod' в server/api/ideas/[id]/index.patch.ts (падение сервера uncaughtException "z is not defined"), сервер стартовал, GET / → 200

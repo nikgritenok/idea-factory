@@ -22,13 +22,13 @@ export const calcExecutor = async (ctx: StepContext): Promise<StepResult> => {
 
   // Сохраняем расчёт в таблицу calculations (TZ §5: хранить формулу/версию/входы/параметры/результат)
   await ctx.db.orm.public.Calculations.create({
-    ideaId: ctx.ideaId,
-    modelVersion: output.result.modelVersion,
     formula: output.result.formula.join('; '),
-    params: output.result.mainVariant,
-    seed: BigInt(output.seed),
+    ideaId: ctx.ideaId,
     inputSummary: output.inputSummary,
-    result: { result: output.result, decision: output.decision },
+    modelVersion: output.result.modelVersion,
+    params: output.result.mainVariant,
+    result: { decision: output.decision, result: output.result },
+    seed: BigInt(output.seed),
     warnings: output.result.warnings,
   })
 
@@ -36,9 +36,9 @@ export const calcExecutor = async (ctx: StepContext): Promise<StepResult> => {
     output: {
       calculation: output.result,
       decision: output.decision,
+      deterministic: true,
       inputSummary: output.inputSummary,
       seed: output.seed,
-      deterministic: true,
       simulation: true,
     },
   }

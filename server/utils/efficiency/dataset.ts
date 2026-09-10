@@ -8,19 +8,18 @@
 import { mulberry32, type Rng } from './prng'
 
 export interface TicketRow {
-  id: number
-  /** Время обработки оператором, минуты */
-  manualMinutes: number
-  /** Классификация оператором корректна */
-  manualCorrect: boolean
-  /** Обращение возвращалось на доработку */
-  reworked: boolean
   /** Категория обращения (для MVP-сценария §10) */
   category: 'вопрос' | 'жалоба' | 'запрос' | 'предложение'
+  id: number
+  /** Классификация оператором корректна */
+  manualCorrect: boolean
+  /** Время обработки оператором, минуты */
+  manualMinutes: number
+  /** Обращение возвращалось на доработку */
+  reworked: boolean
 }
 
 export interface GeneratedDataset {
-  rows: readonly TicketRow[]
   meta: {
     kind: 'simulation'
     seed: number
@@ -33,6 +32,7 @@ export interface GeneratedDataset {
       reworkRate: number
     }
   }
+  rows: readonly TicketRow[]
 }
 
 /** Box–Muller: нормальное распределение из равномерного RNG */
@@ -74,27 +74,27 @@ export function generateDataset(seed: number, overrides: Partial<DatasetParams> 
 
     const catIdx = Math.floor(rng() * CATEGORIES.length)
     rows.push({
-      id: i + 1,
-      manualMinutes: Math.round(manualMinutes * 100) / 100,
-      manualCorrect,
-      reworked,
       category: CATEGORIES[catIdx] as TicketRow['category'],
+      id: i + 1,
+      manualCorrect,
+      manualMinutes: Math.round(manualMinutes * 100) / 100,
+      reworked,
     })
   }
 
   return {
-    rows,
     meta: {
       kind: 'simulation',
-      seed,
-      rowCount: rows.length,
       params: {
         baseMinutesMean: params.baseMinutesMean,
         baseMinutesSd: params.baseMinutesSd,
         correctRate: params.correctRate,
         reworkRate: params.reworkRate,
       },
+      rowCount: rows.length,
+      seed,
     },
+    rows,
   }
 }
 
@@ -107,14 +107,14 @@ export function datasetSummary(ds: GeneratedDataset): Record<string, unknown> {
   const reworked = valid.filter(r => r.reworked).length
 
   return {
+    correctRate: valid.length > 0 ? correct / valid.length : 0,
     kind: ds.meta.kind,
-    seed: ds.meta.seed,
-    rowCount: ds.rows.length,
+    meanMinutes: valid.length > 0 ? totalMinutes / valid.length : 0,
     missingCount: missing,
     missingRate: ds.rows.length > 0 ? missing / ds.rows.length : 0,
-    meanMinutes: valid.length > 0 ? totalMinutes / valid.length : 0,
-    correctRate: valid.length > 0 ? correct / valid.length : 0,
     reworkRate: valid.length > 0 ? reworked / valid.length : 0,
+    rowCount: ds.rows.length,
+    seed: ds.meta.seed,
     unit: 'минуты на обращение',
   }
 }

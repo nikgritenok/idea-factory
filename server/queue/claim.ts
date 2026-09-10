@@ -3,7 +3,7 @@ import type { JobCheckpoint, JobRow, PrismaDb } from './types'
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { effectivePriority } from './priority'
 
-function toEpochMs(value: Date | Temporal.Instant | string): number {
+function toEpochMs(value: Date | string | Temporal.Instant): number {
   if (value instanceof Date) return value.getTime()
   if (typeof value === 'string') return Temporal.Instant.from(value).epochMilliseconds
   return Number(value.epochMilliseconds)
@@ -33,12 +33,12 @@ export async function claimNextJob(db: PrismaDb, opts: ClaimOptions = {}): Promi
     // 1. Восстановление (только при старте воркера)
     if (opts.resumeRunning) {
       const interrupted = await tx.orm.public.QueueJobs
-        .where((f) => f.status.eq('running'))
-        .orderBy((f) => f.startedAt.asc())
+        .where(f => f.status.eq('running'))
+        .orderBy(f => f.startedAt.asc())
         .first()
       if (interrupted) {
         const claimed = await tx.orm.public.QueueJobs
-          .where((f) => f.id.eq(interrupted.id))
+          .where(f => f.id.eq(interrupted.id))
           .update({ attempts: interrupted.attempts + 1 })
         return claimed as unknown as JobRow
       }
@@ -48,8 +48,8 @@ export async function claimNextJob(db: PrismaDb, opts: ClaimOptions = {}): Promi
     // 2. Очередь: расчёт эффективного приоритета с анти-голоданием (TZ §8)
     const now = opts.now ?? new Date()
     const candidates = await tx.orm.public.QueueJobs
-      .where((f) => f.status.eq('queued'))
-      .orderBy((f) => f.enqueuedAt.asc())
+      .where(f => f.status.eq('queued'))
+      .orderBy(f => f.enqueuedAt.asc())
       .limit(20)
       .all()
 
@@ -80,13 +80,13 @@ export async function claimNextJob(db: PrismaDb, opts: ClaimOptions = {}): Promi
     // Условный переход queued→running: если задачу забрал параллельный воркер,
     // UPDATE не совпадёт — возвращаем undefined (не выдаём дубль)
     const claimed = await tx.orm.public.QueueJobs
-      .where((f) => f.id.eq(best.id))
-      .where((f) => f.status.eq('queued'))
+      .where(f => f.id.eq(best.id))
+      .where(f => f.status.eq('queued'))
       .update({
-        status: 'running',
-        startedAt: new Date(),
         attempts: best.attempts + 1,
         effectivePriority: bestScore,
+        startedAt: new Date(),
+        status: 'running',
       })
     return claimed as unknown as JobRow | undefined
   })

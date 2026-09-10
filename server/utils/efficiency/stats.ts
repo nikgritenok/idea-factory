@@ -6,13 +6,13 @@
 import { mulberry32, type Rng } from './prng'
 
 export interface BootstrapResult {
+  ci: { lower: number, upper: number }
   /** Точечная оценка разницы средних (base − variant) */
   meanDiff: number
-  ci: { lower: number, upper: number }
-  resamples: number
-  seed: number
   /** Доля ресемплов, где разница ≤ 0 (включает «без изменений») */
   pDeleterious: number
+  resamples: number
+  seed: number
 }
 
 const DEFAULT_RESAMPLES = 10_000
@@ -56,7 +56,7 @@ export function bootstrapMeanDiff(
   const meanDiff = mean(baseValid) - mean(variantValid)
 
   if (baseValid.length < 2 || variantValid.length < 2) {
-    return { meanDiff, ci: { lower: 0, upper: 0 }, resamples: 0, seed, pDeleterious: meanDiff <= 0 ? 1 : 0 }
+    return { ci: { lower: 0, upper: 0 }, meanDiff, pDeleterious: meanDiff <= 0 ? 1 : 0, resamples: 0, seed }
   }
 
   const rng = mulberry32(seed)
@@ -78,10 +78,10 @@ export function bootstrapMeanDiff(
   const deleterious = diffs.filter(d => d <= 0).length
 
   return {
-    meanDiff,
     ci: { lower: percentile(sorted, 0.025), upper: percentile(sorted, 0.975) },
+    meanDiff,
+    pDeleterious: deleterious / resamples,
     resamples,
     seed,
-    pDeleterious: deleterious / resamples,
   }
 }

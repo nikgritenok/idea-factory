@@ -6,32 +6,32 @@
 
 import type { CalculationResult, ModelParams } from './model'
 
+import { type DatasetParams, datasetSummary, generateDataset, type GeneratedDataset } from './dataset'
 import { decide } from './decision'
-import { generateDataset, datasetSummary, type DatasetParams, type GeneratedDataset } from './dataset'
 import { computeScenarios, computeSensitivity, computeVariant, MODEL_FORMULA, MODEL_VERSION, PARAM_DEFAULTS } from './model'
 import { seedFromString } from './prng'
 
 export interface EfficiencyInput {
+  /** Переопределение параметров датасета (нулевая база, объём и т.д.) */
+  datasetParams?: Partial<DatasetParams>
   /** Транскрипт идеи (для seed-строки; может быть пустым) */
   ideaTranscript: string
   /** Переопределение параметров модели (для чувствительности и тестов) */
   params?: Partial<ModelParams>
-  /** Переопределение параметров датасета (нулевая база, объём и т.д.) */
-  datasetParams?: Partial<DatasetParams>
   /** Явный seed; по умолчанию — стабильный хеш транскрипта */
   seed?: number
 }
 
 export interface EfficiencyOutput {
-  result: CalculationResult
-  decision: ReturnType<typeof decide>
-  /** Сводка датасета для calculations.input_summary */
-  inputSummary: Record<string, unknown>
   /** Датасет — для записи в таблицу datasets при прогоне */
   dataset: GeneratedDataset
-  seed: number
+  decision: ReturnType<typeof decide>
   /** Достаточно ли данных для решения (менее 2 валидных наблюдений → нет) */
   hasEnoughData: boolean
+  /** Сводка датасета для calculations.input_summary */
+  inputSummary: Record<string, unknown>
+  result: CalculationResult
+  seed: number
 }
 
 /**
@@ -65,34 +65,34 @@ export function computeEfficiency(input: EfficiencyInput): EfficiencyOutput {
   }
 
   const result: CalculationResult = {
-    modelVersion: MODEL_VERSION,
-    formula: MODEL_FORMULA,
-    units: {
-      effectPerTicket: 'минуты на обращение',
-      effectVolumeHours: 'часов в месяц',
-      quality: 'доля корректных классификаций (0–1)',
-      variantMinutes: 'минуты на обращение',
-    },
     baseline: {
       meanMinutes: validRows.length > 0 ? validRows.reduce((s, r) => s + r.manualMinutes, 0) / validRows.length : 0,
       quality: validRows.length > 0 ? validRows.filter(r => r.manualCorrect).length / validRows.length : 0,
       reworkRate: validRows.length > 0 ? validRows.filter(r => r.reworked).length / validRows.length : 0,
       rowCount: ds.rows.length,
     },
+    formula: MODEL_FORMULA,
     mainVariant,
+    modelVersion: MODEL_VERSION,
     scenarios,
     sensitivity,
+    units: {
+      effectPerTicket: 'минуты на обращение',
+      effectVolumeHours: 'часов в месяц',
+      quality: 'доля корректных классификаций (0–1)',
+      variantMinutes: 'минуты на обращение',
+    },
     warnings,
   }
 
   const decision = decide(result, validRows.length >= 2)
 
   return {
-    result,
-    decision,
-    inputSummary: datasetSummary(ds),
     dataset: ds,
-    seed,
+    decision,
     hasEnoughData: validRows.length >= 2,
+    inputSummary: datasetSummary(ds),
+    result,
+    seed,
   }
 }

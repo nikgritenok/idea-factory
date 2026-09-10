@@ -12,7 +12,7 @@ export function titleFromTranscript(transcript: string): string {
 
 export async function countActiveIdeas(): Promise<number> {
   const result = await db.orm.public.Ideas
-    .where((f) => f.funnelStage.neq('archived'))
-    .aggregate((a) => ({ n: a.count() }))
+    .where(f => f.funnelStage.neq('archived'))
+    .aggregate(a => ({ n: a.count() }))
   return result.n
 }

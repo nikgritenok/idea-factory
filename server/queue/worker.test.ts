@@ -1,15 +1,15 @@
 import 'temporal-polyfill/full/global'
 import 'dotenv/config'
 import postgres from '@prisma/orm-postgres/runtime'
-import pg from 'pg'
-import type { Contract } from '../../src/prisma/contract.d'
-import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import type { Contract } from '../../src/prisma/contract.d'
 import type { JobRow, StepExecutor } from './types'
 
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
 import { type CheckpointerHandle, createCheckpointer, ensureCheckpointerTables } from './checkpointer'
 import { claimNextJob } from './claim'
 import { cancelJob, pauseJob, QueueControlError, resumeJob, retryStep, setJobPriority } from './controls'
@@ -31,7 +31,8 @@ async function applyMigrations(dbUrl: string): Promise<void> {
   const client = new pg.Pool({ connectionString: dbUrl })
   try {
     await client.query(idempotent)
-  } finally {
+  }
+  finally {
     await client.end()
   }
 }
@@ -115,7 +116,7 @@ function openBarrier(): { promise: Promise<void>, release: () => void } {
 
 async function insertIdea(title: string, priority?: string): Promise<string> {
   const idea = priority
-    ? await db.orm.public.Ideas.create({ title, priority })
+    ? await db.orm.public.Ideas.create({ priority, title })
     : await db.orm.public.Ideas.create({ title })
   return idea.id
 }
@@ -154,7 +155,8 @@ async function waitForCheckpointStability(threadId: string): Promise<void> {
       last = n
       await new Promise(r => setTimeout(r, 40))
     }
-  } finally {
+  }
+  finally {
     await client.end()
   }
 }

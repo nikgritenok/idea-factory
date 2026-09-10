@@ -3,8 +3,9 @@
  * Вызывает POST /validate с протоколом прогона.
  */
 
-import { db } from '../utils/db'
 import type { RunCallRecord } from '../queue/run-protocol'
+
+import { db } from '../utils/db'
 
 const VALIDATOR_URL = process.env.VALIDATOR_URL ?? 'http://localhost:3001'
 
@@ -15,8 +16,8 @@ export interface ValidateInput {
 }
 
 export interface ValidateResult {
-  valid: boolean
   errors: string[]
+  valid: boolean
 }
 
 export class ValidatorError extends Error {
@@ -38,7 +39,7 @@ export async function validateRules(
   runId?: string,
 ): Promise<ValidateResult> {
   const started = Date.now()
-  let response: ValidateResult | undefined
+  let response: undefined | ValidateResult
   let ok = true
   let error: string | undefined
 
@@ -59,7 +60,7 @@ export async function validateRules(
   catch (err) {
     ok = false
     error = err instanceof Error ? err.message : String(err)
-    response = { valid: false, errors: [error] }
+    response = { errors: [error], valid: false }
   }
 
   // Запись в run_calls, если передан runId
@@ -67,22 +68,22 @@ export async function validateRules(
     const callRecord: RunCallRecord = {
       component: 'validator',
       componentVersion: '1.0.0',
+      durationMs: Date.now() - started,
+      error,
+      ok,
       request: input,
       response,
-      durationMs: Date.now() - started,
-      ok,
-      error,
     }
 
     await db.orm.public.RunCalls.create({
-      runId,
       component: callRecord.component,
       componentVersion: callRecord.componentVersion,
+      durationMs: callRecord.durationMs,
+      error: callRecord.error ?? null,
+      ok: callRecord.ok,
       request: callRecord.request,
       response: callRecord.response,
-      durationMs: callRecord.durationMs,
-      ok: callRecord.ok,
-      error: callRecord.error ?? null,
+      runId,
     })
   }
 
@@ -90,7 +91,7 @@ export async function validateRules(
     throw new ValidatorError(error ?? 'Неизвестная ошибка валидатора')
   }
 
-  return response as ValidateResult
+  return response
 }
 
 /**

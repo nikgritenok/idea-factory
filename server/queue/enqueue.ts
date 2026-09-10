@@ -16,7 +16,7 @@ export async function enqueueIdeaAnalysis(
 ): Promise<{ job: JobRow, created: boolean }> {
   const idea = await db.orm.public.Ideas
     .select('id', 'funnelStage', 'priority')
-    .where((f) => f.id.eq(ideaId))
+    .where(f => f.id.eq(ideaId))
     .first()
   if (!idea) {
     throw new QueueControlError(`Идея не найдена: ${ideaId}`, 404)
@@ -29,9 +29,9 @@ export async function enqueueIdeaAnalysis(
 
   // Активная задача уже есть → идемпотентный возврат (повторный клик не создаёт дубль)
   const existing = await db.orm.public.QueueJobs
-    .where((f) => f.ideaId.eq(ideaId))
-    .where((f) => f.status.in(['queued', 'running', 'paused']))
-    .orderBy((f) => f.enqueuedAt.desc())
+    .where(f => f.ideaId.eq(ideaId))
+    .where(f => f.status.in(['queued', 'running', 'paused']))
+    .orderBy(f => f.enqueuedAt.desc())
     .first()
   if (existing) {
     return { created: false, job: existing as unknown as JobRow }
@@ -52,13 +52,13 @@ async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: st
         'enqueuedAt', 'startedAt', 'finishedAt', 'error',
       )
       .create({
-        ideaId,
-        priority,
         effectivePriority: QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase],
+        ideaId,
         idempotencyKey: key,
+        priority,
       })
     await db.orm.public.Ideas
-      .where((f) => f.id.eq(ideaId))
+      .where(f => f.id.eq(ideaId))
       .update({
         funnelStage: 'queued',
         updatedAt: new Date(),
@@ -72,7 +72,7 @@ async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: st
   // Ключ занят: активная задача → идемпотентный возврат (гонка параллельных кликов),
   // завершённая → освобождаем ключ (версионируем) и вставляем заново
   const old = await db.orm.public.QueueJobs
-    .where((f) => f.idempotencyKey.eq(key))
+    .where(f => f.idempotencyKey.eq(key))
     .first()
   if (old) {
     const status = (old as unknown as JobRow).status
@@ -80,7 +80,7 @@ async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: st
       return old as unknown as JobRow
     }
     await db.orm.public.QueueJobs
-      .where((f) => f.id.eq(old.id))
+      .where(f => f.id.eq(old.id))
       .update({ idempotencyKey: `${key}:${old.id}` })
   }
   const job2 = await db.orm.public.QueueJobs
@@ -90,16 +90,16 @@ async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: st
       'enqueuedAt', 'startedAt', 'finishedAt', 'error',
     )
     .create({
-      ideaId,
-      priority,
       effectivePriority: QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase],
+      ideaId,
       idempotencyKey: key,
+      priority,
     })
   if (!job2) {
     throw new Error(`Не удалось поставить задачу в очередь: ${ideaId}`)
   }
   await db.orm.public.Ideas
-    .where((f) => f.id.eq(ideaId))
+    .where(f => f.id.eq(ideaId))
     .update({
       funnelStage: 'queued',
       updatedAt: new Date(),

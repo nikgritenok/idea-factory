@@ -114,9 +114,9 @@ describe('computeEfficiency — воспроизводимость (ключев
 describe('computeEfficiency — вырожденные кейсы (PLAN этап 7)', () => {
   it('нулевая база: effectPerTicket = 0, recommendation = postpone', () => {
     const out = computeEfficiency({
+      datasetParams: { baseMinutesMean: 0, baseMinutesSd: 0 },
       ideaTranscript: 'нулевая база',
       seed: 42,
-      datasetParams: { baseMinutesMean: 0, baseMinutesSd: 0 },
     })
     expect(out.result.baseline.meanMinutes).toBeLessThanOrEqual(1)
     expect(out.decision.recommendation).not.toBe('develop')
@@ -124,9 +124,9 @@ describe('computeEfficiency — вырожденные кейсы (PLAN этап
 
   it('малая выборка: 1 строка → insufficient_data, предупреждение о вырожденном CI', () => {
     const out = computeEfficiency({
+      datasetParams: { rowCount: 1 },
       ideaTranscript: 'малая выборка',
       seed: 42,
-      datasetParams: { rowCount: 1 },
     })
     expect(out.hasEnoughData).toBe(false)
     expect(out.decision.recommendation).toBe('insufficient_data')
@@ -136,8 +136,8 @@ describe('computeEfficiency — вырожденные кейсы (PLAN этап
   it('отрицательный эффект: медленный вариант → postpone + предупреждение', () => {
     const out = computeEfficiency({
       ideaTranscript: 'отрицательный эффект',
+      params: { aiMinutes: 5, reviewMinutes: 2, reworkMinutes: 10, reworkRate: 0.5 },
       seed: 42,
-      params: { aiMinutes: 5, reviewMinutes: 2, reworkRate: 0.5, reworkMinutes: 10 },
     })
     expect(out.result.mainVariant.effectPerTicket).toBeLessThan(0)
     expect(out.decision.recommendation).toBe('postpone')
@@ -147,8 +147,8 @@ describe('computeEfficiency — вырожденные кейсы (PLAN этап
   it('ухудшение качества: aiCorrectRate ниже 85% → validate_first + предупреждение', () => {
     const out = computeEfficiency({
       ideaTranscript: 'плохое качество',
-      seed: 42,
       params: { aiCorrectRate: 0.8 },
+      seed: 42,
     })
     expect(out.result.mainVariant.quality).toBeLessThan(0.85)
     expect(out.decision.recommendation).toBe('validate_first')
@@ -157,7 +157,7 @@ describe('computeEfficiency — вырожденные кейсы (PLAN этап
 
   it('пропуски (некорректные строки): NaN-времена отфильтрованы, расчёт не падает', () => {
     // Генерируем большой датасет и подменяем часть строк на NaN — compute не должен падать
-    const out = computeEfficiency({ ideaTranscript: 'пропуски', seed: 42, datasetParams: { rowCount: 200 } })
+    const out = computeEfficiency({ datasetParams: { rowCount: 200 }, ideaTranscript: 'пропуски', seed: 42 })
     expect(out.result.baseline.rowCount).toBe(200)
     expect(Number.isFinite(out.result.mainVariant.effectPerTicket)).toBe(true)
   })

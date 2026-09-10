@@ -1,12 +1,13 @@
 import 'dotenv/config'
 import postgres from '@prisma/orm-postgres/runtime'
-import pg from 'pg'
-import type { Contract } from '../../src/prisma/contract.d'
-import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import pg from 'pg'
 import { beforeAll, describe, expect, it } from 'vitest'
 
+import type { Contract } from '../../src/prisma/contract.d'
+
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
 import { countActiveIdeas, IDEA_LIMIT_ACTIVE, titleFromTranscript } from './ideas'
 
 const DB
@@ -24,7 +25,8 @@ async function applyMigrations(dbUrl: string): Promise<void> {
   const client = new pg.Pool({ connectionString: dbUrl })
   try {
     await client.query(idempotent)
-  } finally {
+  }
+  finally {
     await client.end()
   }
 }
@@ -62,7 +64,7 @@ describe('countActiveIdeas / лимит очереди (TZ §8)', () => {
     for (let i = 0; i < 3; i++) {
       await db.orm.public.Ideas.create({ title: `t${i}` })
     }
-    await db.orm.public.Ideas.create({ title: 'arch', funnelStage: 'archived' })
+    await db.orm.public.Ideas.create({ funnelStage: 'archived', title: 'arch' })
 
     expect(await countActiveIdeas()).toBe(3)
   })

@@ -74,7 +74,7 @@ describe('LLM-исполнитель', () => {
       sql: {} as never,
       state: {
         efficiency_model: { scenarios: [] },
-        idea_analysis: { title: 'Идея', sourceTranscript: 'Текст идеи' },
+        idea_analysis: { sourceTranscript: 'Текст идеи', title: 'Идея' },
         market_research: { competitors: [] },
         strategy: { experiments: [] },
       },

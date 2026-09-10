@@ -9,20 +9,20 @@ import { db } from '../utils/db'
 export interface RunCallRecord {
   component: string
   componentVersion?: string
+  durationMs: number
+  error?: string
+  ok: boolean
   request: unknown
   response: unknown
-  durationMs: number
-  ok: boolean
-  error?: string
 }
 
 export interface RunRecord {
-  ideaId: string
-  datasetId?: string
-  variant: string
   componentVersions: Record<string, string>
   configVersion: string
+  datasetId?: string
+  ideaId: string
   isFixture: boolean
+  variant: string
 }
 
 /**
@@ -35,13 +35,13 @@ export async function createRun(
   const row = await db.orm.public.Runs
     .select('id')
     .create({
-      ideaId: record.ideaId,
-      datasetId: record.datasetId ?? null,
-      variant: record.variant,
       componentVersions: record.componentVersions,
       configVersion: record.configVersion,
+      datasetId: record.datasetId ?? null,
+      ideaId: record.ideaId,
       isFixture: record.isFixture,
       status: 'running',
+      variant: record.variant,
     })
   return row.id
 }
@@ -56,14 +56,14 @@ export async function recordRunCall(
   const row = await db.orm.public.RunCalls
     .select('id')
     .create({
-      runId,
       component: call.component,
       componentVersion: call.componentVersion ?? null,
+      durationMs: call.durationMs,
+      error: call.error ?? null,
+      ok: call.ok,
       request: call.request,
       response: call.response,
-      durationMs: call.durationMs,
-      ok: call.ok,
-      error: call.error ?? null,
+      runId,
     })
   return row.id
 }
@@ -77,11 +77,11 @@ export async function finishRun(
   error?: string,
 ): Promise<void> {
   await db.orm.public.Runs
-    .where((f) => f.id.eq(runId))
+    .where(f => f.id.eq(runId))
     .update({
-      status,
-      finishedAt: new Date(),
       error: error ?? null,
+      finishedAt: new Date(),
+      status,
     })
 }
 
@@ -112,11 +112,11 @@ export async function withRunCall<T>(
     await recordRunCall(runId, {
       component,
       componentVersion,
+      durationMs: Date.now() - started,
+      error,
+      ok,
       request,
       response,
-      durationMs: Date.now() - started,
-      ok,
-      error,
     })
   }
 

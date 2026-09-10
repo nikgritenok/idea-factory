@@ -1,13 +1,14 @@
 import 'temporal-polyfill/full/global'
 import 'dotenv/config'
 import postgres from '@prisma/orm-postgres/runtime'
-import pg from 'pg'
-import type { Contract } from '../../src/prisma/contract.d'
-import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
+import type { Contract } from '../../src/prisma/contract.d'
+
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
 import { claimNextJob } from './claim'
 import { enqueueIdeaAnalysis } from './enqueue'
 
@@ -26,7 +27,8 @@ async function applyMigrations(dbUrl: string): Promise<void> {
   const client = new pg.Pool({ connectionString: dbUrl })
   try {
     await client.query(idempotent)
-  } finally {
+  }
+  finally {
     await client.end()
   }
 }
@@ -52,7 +54,7 @@ afterAll(async () => {
 })
 
 async function insertIdea(title: string, priority: 'high' | 'low' | 'medium' = 'medium'): Promise<string> {
-  const idea = await db.orm.public.Ideas.create({ title, priority })
+  const idea = await db.orm.public.Ideas.create({ priority, title })
   return idea.id
 }
 
@@ -91,7 +93,7 @@ describe('enqueueIdeaAnalysis (TZ §8: постановка в очередь)',
     const first = await enqueueIdeaAnalysis(db, ideaId)
     await db.orm.public.QueueJobs
       .where(f => f.id.eq(first.job.id))
-      .update({ status: 'done', finishedAt: new Date() })
+      .update({ finishedAt: new Date(), status: 'done' })
 
     const second = await enqueueIdeaAnalysis(db, ideaId)
     expect(second.created).toBe(true)
@@ -105,7 +107,7 @@ describe('enqueueIdeaAnalysis (TZ §8: постановка в очередь)',
   })
 
   it('архивная идея не ставится в очередь', async () => {
-    const idea = await db.orm.public.Ideas.create({ title: 'enqueue-архив', funnelStage: 'archived' })
+    const idea = await db.orm.public.Ideas.create({ funnelStage: 'archived', title: 'enqueue-архив' })
     await expect(enqueueIdeaAnalysis(db, idea.id)).rejects.toThrow(/архиве/)
   })
 })
@@ -204,8 +206,8 @@ describe('resume-first и блокировки claim', () => {
     const leftover = await db.orm.public.QueueJobs.create({
       ideaId: runningIdea,
       priority: 'low',
-      status: 'running',
       startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      status: 'running',
     })
 
     const queuedIdea = await insertIdea('resume-first-queued', 'high')

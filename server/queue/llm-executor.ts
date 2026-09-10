@@ -49,10 +49,10 @@ function buildUserPrompt(stepId: string, ideaTranscript: string, previousResults
     }
     case 'critic': {
       const analysisData = JSON.stringify({
+        efficiency: previousResults.efficiency_model,
         idea: previousResults.idea_analysis,
         market: previousResults.market_research,
         strategy: previousResults.strategy,
-        efficiency: previousResults.efficiency_model,
       }, null, 2)
       return (role as { user: (idea: string, analysis: string) => string }).user(ideaTranscript, analysisData)
     }
@@ -102,39 +102,34 @@ export function createLlmExecutor(roleId: string) {
 
     // Запись вызова через протокол прогона
     const runId = (ctx.state as { runId?: string }).runId
-    const request = { system: llmRole.system, user: userPrompt, temperature: llmRole.temperature, maxTokens: llmRole.maxTokens }
+    const request = { maxTokens: llmRole.maxTokens, system: llmRole.system, temperature: llmRole.temperature, user: userPrompt }
 
     const callFn = async () => {
-      return callLlm(
+      return await callLlm(
         llmRole.schema as Parameters<typeof callLlm>[0],
         {
-          system: llmRole.system,
-          user: userPrompt,
-          temperature: llmRole.temperature,
           maxTokens: llmRole.maxTokens,
+          system: llmRole.system,
+          temperature: llmRole.temperature,
           timeoutMs: llmRole.timeoutMs,
+          user: userPrompt,
         },
       )
     }
 
     let result: Awaited<ReturnType<typeof callFn>>
 
-    if (ctx.db && runId) {
-      result = await withRunCall(runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn)
-    }
-    else {
-      result = await callFn()
-    }
+    result = ctx.db && runId ? (await withRunCall(runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn)) : (await callFn())
 
     return {
       output: {
         data: result.data,
         metadata: {
+          cost: result.cost,
           model: 'z-ai/glm-5.3-flash',
           role: roleId,
           step: ctx.step.id,
           usage: result.usage,
-          cost: result.cost,
         },
       },
     }

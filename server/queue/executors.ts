@@ -1,8 +1,8 @@
 import type { ExecutorKind } from '../../config/pipeline'
 import type { StepExecutor } from './types'
 
-import { createLlmExecutor } from './llm-executor'
 import { calcExecutor } from './calc-executor'
+import { createLlmExecutor } from './llm-executor'
 
 /**
  * Реестр исполнителей шагов пайплайна. Ключ = executor из config/pipeline.ts.
@@ -44,7 +44,7 @@ registry.set('fixture', async (ctx) => {
 registry.set('llm', async (ctx) => {
   const roleId = ctx.step.role
   const executor = createLlmExecutor(roleId)
-  return executor(ctx)
+  return await executor(ctx)
 })
 
 /**

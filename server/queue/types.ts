@@ -1,4 +1,4 @@
-import { db } from '../../src/prisma/db'
+import type { db } from '../../src/prisma/db'
 import type { JobCheckpoint, JobRow, Priority } from '../utils/schemas'
 
 import { JobCheckpointSchema, JobRowSchema, PrioritySchema } from '../utils/schemas'
@@ -11,10 +11,10 @@ export type QueuePriority = Priority
 export type PrismaDb = typeof db
 
 export interface StepContext {
+  db: PrismaDb
   ideaId: string
   jobId: string
   signal: AbortSignal
-  db: PrismaDb
   /** Результаты предыдущих шагов (state.stepResults) */
   state: Record<string, unknown>
   step: { id: string, role: string }

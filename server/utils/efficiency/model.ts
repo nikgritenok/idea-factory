@@ -19,27 +19,27 @@ export const MODEL_FORMULA = [
 ] as const
 
 export interface ModelParams {
-  /** Время ИИ-обработки одного обращения, мин (допущение методики — TZ §15) */
-  aiMinutes: number
-  /** Время ручной проверки ИИ-черновика, мин */
-  reviewMinutes: number
-  /** Доля обращений с ручной доработкой после ИИ (0–1) */
-  reworkRate: number
-  /** Время доработки, мин */
-  reworkMinutes: number
   /** Ожидаемая доля корректных классификаций у ИИ (0–1) */
   aiCorrectRate: number
+  /** Время ИИ-обработки одного обращения, мин (допущение методики — TZ §15) */
+  aiMinutes: number
   /** Число обращений в месяц (для объёмного эффекта) */
   monthlyVolume: number
+  /** Время ручной проверки ИИ-черновика, мин */
+  reviewMinutes: number
+  /** Время доработки, мин */
+  reworkMinutes: number
+  /** Доля обращений с ручной доработкой после ИИ (0–1) */
+  reworkRate: number
 }
 
 export const PARAM_DEFAULTS: ModelParams = {
-  aiMinutes: 0.5,
-  reviewMinutes: 1.5,
-  reworkRate: 0.1,
-  reworkMinutes: 4,
   aiCorrectRate: 0.92,
+  aiMinutes: 0.5,
   monthlyVolume: 200,
+  reviewMinutes: 1.5,
+  reworkMinutes: 4,
+  reworkRate: 0.1,
 }
 
 /** Качественный порог из TZ §1: ниже 85% вариант не проходит */
@@ -48,42 +48,42 @@ export const QUALITY_TARGET = 0.92
 
 /** Результат расчёта одного варианта */
 export interface VariantResult {
-  /** variant_minutes по формуле */
-  variantMinutes: number
+  bootstrap: BootstrapResult
   /** effect_per_ticket, мин */
   effectPerTicket: number
   /** effect_volume, часов в месяц */
   effectVolumeHours: number
   /** Корректность варианта (0–1) */
   quality: number
-  bootstrap: BootstrapResult
+  /** variant_minutes по формуле */
+  variantMinutes: number
 }
 
 /** Один сценарий (базовый/благоприятный/неблагоприятный) */
 export interface ScenarioResult {
-  name: 'base' | 'favorable' | 'unfavorable'
-  params: ModelParams
+  ci: { lower: number, upper: number }
   effectPerTicket: number
   effectVolumeHours: number
+  name: 'base' | 'favorable' | 'unfavorable'
+  params: ModelParams
   quality: number
-  ci: { lower: number, upper: number }
 }
 
 /** Итог расчёта — сохраняется в calculations.result (jsonb) */
 export interface CalculationResult {
-  modelVersion: string
-  formula: readonly string[]
-  units: Record<string, string>
   baseline: {
     meanMinutes: number
     quality: number
     reworkRate: number
     rowCount: number
   }
+  formula: readonly string[]
   mainVariant: VariantResult
+  modelVersion: string
   scenarios: ScenarioResult[]
   /** Чувствительность: изменение параметра → изменение эффекта (TZ §5 п.4) */
   sensitivity: Array<{ param: keyof ModelParams, change: string, effectPerTicketDelta: number }>
+  units: Record<string, string>
   warnings: string[]
 }
 
@@ -107,11 +107,11 @@ export function computeVariant(
   const bootstrap = bootstrapMeanDiff(baseTimes, [vm], seed)
 
   return {
-    variantMinutes: vm,
+    bootstrap,
     effectPerTicket: bootstrap.meanDiff,
     effectVolumeHours: (bootstrap.meanDiff * p.monthlyVolume) / 60,
     quality: p.aiCorrectRate,
-    bootstrap,
+    variantMinutes: vm,
   }
 }
 
@@ -128,11 +128,11 @@ export function computeScenarios(
     { name: 'base', overrides: {} },
     {
       name: 'favorable',
-      overrides: { aiMinutes: base.aiMinutes * 0.7, reworkRate: base.reworkRate * 0.5, aiCorrectRate: Math.min(0.97, base.aiCorrectRate + 0.03) },
+      overrides: { aiCorrectRate: Math.min(0.97, base.aiCorrectRate + 0.03), aiMinutes: base.aiMinutes * 0.7, reworkRate: base.reworkRate * 0.5 },
     },
     {
       name: 'unfavorable',
-      overrides: { aiMinutes: base.aiMinutes * 1.5, reworkRate: base.reworkRate * 1.8, aiCorrectRate: Math.max(0.7, base.aiCorrectRate - 0.08) },
+      overrides: { aiCorrectRate: Math.max(0.7, base.aiCorrectRate - 0.08), aiMinutes: base.aiMinutes * 1.5, reworkRate: base.reworkRate * 1.8 },
     },
   ]
 
@@ -141,12 +141,12 @@ export function computeScenarios(
     const vm = variantMinutes(p)
     const effect = meanBase(ds) - vm
     return {
-      name,
-      params: p,
+      ci: { lower: effect, upper: effect },
       effectPerTicket: effect,
       effectVolumeHours: (effect * p.monthlyVolume) / 60,
+      name,
+      params: p,
       quality: p.aiCorrectRate,
-      ci: { lower: effect, upper: effect },
     }
   })
 }
@@ -165,7 +165,7 @@ export function computeSensitivity(
     const e20 = meanBase(ds) - variantMinutes(p20)
     const em20 = meanBase(ds) - variantMinutes(m20)
     const delta = Math.max(Math.abs(e20 - baseEffect), Math.abs(em20 - baseEffect))
-    return { param, change: '±20%', effectPerTicketDelta: Math.round(delta * 1000) / 1000 }
+    return { change: '±20%', effectPerTicketDelta: Math.round(delta * 1000) / 1000, param }
   }).sort((a, b) => b.effectPerTicketDelta - a.effectPerTicketDelta)
 }
 

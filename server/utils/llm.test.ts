@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
 import { z } from 'zod'
 
 import { callLlm, callLlmText, LlmError } from './llm'
@@ -9,7 +8,7 @@ const originalEnv = process.env
 beforeEach(() => {
   vi.resetModules()
   process.env = { ...originalEnv }
-  process.env.ROUTERAI_API_KEY = 'test-api-key'
+  process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
 })
 
 afterEach(() => {
@@ -21,10 +20,10 @@ const TestSchema = z.object({ title: z.string() })
 
 function mockFetchResponse(body: unknown, ok = true, status = 200) {
   return {
-    json: () => Promise.resolve(body),
+    json: async () => await Promise.resolve(body),
     ok,
     status,
-    text: () => Promise.resolve(JSON.stringify(body)),
+    text: async () => await Promise.resolve(JSON.stringify(body)),
   }
 }
 

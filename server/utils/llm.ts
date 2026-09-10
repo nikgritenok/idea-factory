@@ -4,25 +4,25 @@ const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
 export const LLM_MODEL = 'z-ai/glm-5.3-flash'
 
 export interface LlmCallOptions {
-  /** System prompt — роль и границы */
-  system: string
-  /** User prompt — задача с входными данными */
-  user: string
   /** Максимум токенов в ответе (по умолчанию 4096) */
   maxTokens?: number
+  /** System prompt — роль и границы */
+  system: string
   /** Температура (0.0–2.0, по умолчанию 0.3) */
   temperature?: number
   /** Таймаут запроса в мс (по умолчанию 60000) */
   timeoutMs?: number
+  /** User prompt — задача с входными данными */
+  user: string
 }
 
 export interface LlmCallResult<T> {
+  /** Стоимость запроса (в рублях) */
+  cost?: number
   /** Распарсенный и валидированный ответ */
   data: T
   /** Количество использованных токенов */
   usage?: { completionTokens?: number, promptTokens?: number, totalTokens?: number }
-  /** Стоимость запроса (в рублях) */
-  cost?: number
 }
 
 export class LlmError extends Error {
@@ -49,22 +49,22 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
   const body = {
     max_tokens: options.maxTokens ?? 4096,
     messages: [
-      { role: 'system', content: options.system },
-      { role: 'user', content: options.user },
+      { content: options.system, role: 'system' },
+      { content: options.user, role: 'user' },
     ],
     model: LLM_MODEL,
     temperature: options.temperature ?? 0.3,
   }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000)
+  const timeout = setTimeout(() => { controller.abort() }, options.timeoutMs ?? 60_000)
 
   let res: Response
   try {
     res = await fetch(`${ROUTERAI_BASE}/chat/completions`, {
       body: JSON.stringify(body),
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       method: 'POST',
