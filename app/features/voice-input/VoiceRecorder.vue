@@ -32,10 +32,9 @@ async function toggle(): Promise<void> {
         :aria-label="recording ? 'Остановить запись и расшифровать' : 'Начать голосовой ввод'"
         @click="toggle"
       >
-        <span
-          class="inline-block size-3 rounded-full"
-          :class="recording ? 'animate-pulse bg-white' : 'bg-[#111111]'"
-          aria-hidden="true"
+        <Icon
+          :name="recording ? 'lucide:mic-off' : 'lucide:mic'"
+          class="size-4"
         />
         {{ recording ? `Идёт запись · ${durationSec} с — остановить` : 'Продиктовать идею' }}
       </button>

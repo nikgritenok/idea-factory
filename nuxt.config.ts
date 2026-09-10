@@ -22,7 +22,6 @@ export default defineNuxtConfig({
         },
       ],
     },
-    pageTransition: { name: 'page', mode: 'out-in' },
   },
   css: ['~/assets/css/tailwind.css'],
   runtimeConfig: {

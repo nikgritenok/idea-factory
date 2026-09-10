@@ -9,15 +9,14 @@ const isDemo = computed(() => route.query.demo === '1')
 const { error, ideas, pending, refresh } = useIdeas()
 
 const stageFilter = ref<string>('all')
-const runningJobs = ref<Record<string, { status: string, currentStep: null | string }>>({})
-const actionError = ref<null | string>(null)
-const busyIdeaId = ref<null | string>(null)
+const archivedIdeas = ref<IdeaSummary[]>([])
+const loadingArchived = ref(false)
 
-const filtered = computed(() =>
-  stageFilter.value === 'all'
-    ? ideas.value
-    : ideas.value.filter(i => i.funnelStage === stageFilter.value),
-)
+const filtered = computed(() => {
+  if (stageFilter.value === 'all') return ideas.value
+  if (stageFilter.value === 'archived') return archivedIdeas.value
+  return ideas.value.filter(i => i.funnelStage === stageFilter.value)
+})
 
 const activeCount = computed(() =>
   ideas.value.filter(i => i.funnelStage !== 'archived').length,
@@ -25,12 +24,39 @@ const activeCount = computed(() =>
 
 const LIMIT = 10
 
+const archivedCount = computed(() => archivedIdeas.value.length)
+
 function stageClasses(stage: string): string {
   if (stage === 'mvp_ready') return 'bg-success-soft text-success'
   if (stage === 'decision') return 'bg-accent/20 text-[#7a5200]'
   if (stage === 'draft') return 'bg-muted text-muted-foreground'
+  if (stage === 'archived') return 'bg-muted text-muted-foreground'
   return 'bg-primary-soft text-primary'
 }
+
+const runningJobs = ref<Record<string, { status: string, currentStep: null | string }>>({})
+const actionError = ref<null | string>(null)
+const busyIdeaId = ref<null | string>(null)
+
+async function loadArchived(): Promise<void> {
+  loadingArchived.value = true
+  try {
+    const data = await $fetch<{ ideas: IdeaSummary[] }>('/api/ideas', { query: { stage: 'archived' } })
+    archivedIdeas.value = data.ideas
+  }
+  catch {
+    // не критично
+  }
+  finally {
+    loadingArchived.value = false
+  }
+}
+
+watch(stageFilter, (v) => {
+  if (v === 'archived' && archivedIdeas.value.length === 0) {
+    loadArchived()
+  }
+})
 
 function priorityClasses(priority: string): string {
   if (priority === 'high') return 'bg-secondary-soft text-foreground'
@@ -142,7 +168,7 @@ const emptyText = computed(() =>
         :class="stageFilter === stage ? 'bg-foreground text-background' : 'bg-surface text-foreground'"
         @click="stageFilter = stage"
       >
-        {{ FUNNEL_LABELS[stage] }} ({{ ideas.filter(i => i.funnelStage === stage).length }})
+        {{ FUNNEL_LABELS[stage] }} ({{ stage === 'archived' ? archivedCount : ideas.filter(i => i.funnelStage === stage).length }})
       </button>
     </div>
 

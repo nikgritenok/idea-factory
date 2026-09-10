@@ -8,7 +8,10 @@ const navItems = [
 ] as const
 
 function isActive(to: string): boolean {
-  return to === '/ideas' ? route.path === '/ideas' || route.path.startsWith('/ideas/') : route.path.startsWith(to)
+  if (to === '/ideas') {
+    return route.path === '/ideas' || (/^\/ideas\/[a-f0-9-]+$/.test(route.path))
+  }
+  return route.path === to
 }
 </script>
 

@@ -1,8 +1,10 @@
 import { db } from '../../utils/db'
 
-export default defineEventHandler(async () => {
-  const rows = await db.orm.public.Ideas
-    .where(f => f.funnelStage.neq('archived'))
+export default defineEventHandler(async (event) => {
+  const query = getQuery(event)
+  const stage = query.stage as string | undefined
+
+  let q = db.orm.public.Ideas
     .select(
       'id', 'title', 'sourceTranscript', 'sourceKind',
       'structuredIdea', 'problem', 'audience', 'value',
@@ -11,8 +13,18 @@ export default defineEventHandler(async () => {
       'baselineMetrics', 'expectedEffect',
       'createdAt', 'updatedAt', 'version',
     )
+
+  if (stage) {
+    q = q.where(f => f.funnelStage.eq(stage))
+  }
+  else {
+    q = q.where(f => f.funnelStage.neq('archived'))
+  }
+
+  const rows = await q
     .orderBy(f => f.priority.asc())
     .orderBy(f => f.createdAt.desc())
     .all()
+
   return { ideas: rows }
 })
