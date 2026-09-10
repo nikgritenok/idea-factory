@@ -14,7 +14,7 @@ export default defineNitroPlugin(async () => {
   await ensureMigrated()
 
   const handle = createCheckpointer()
-  const worker = new AnalysisWorker(db(), { checkpointer: handle, steps: PIPELINE_STEPS })
+  const worker = new AnalysisWorker(db, { checkpointer: handle, steps: PIPELINE_STEPS })
 
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`[worker] ${signal}: останавливаюсь после текущей задачи`)

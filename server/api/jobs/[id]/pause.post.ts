@@ -5,10 +5,9 @@ import { parseUuid } from '../../../utils/schemas'
 // POST /api/jobs/:id/pause — пауза задачи (TZ §8)
 export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const sql = db()
 
   try {
-    const job = await pauseJob(sql, jobId)
+    const job = await pauseJob(db, jobId)
     return { job }
   }
   catch (error) {

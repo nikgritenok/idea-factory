@@ -36,3 +36,5 @@ playwright-report/
 # Agent skills (installed by evlog agents / playwright-cli install)
 .agents/
 .claude/
+node_modules/
+dist/

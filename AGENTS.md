@@ -52,10 +52,10 @@ pnpm typecheck              # Type checking (vue-tsc via Nuxt)
 pnpm test                   # Vitest
 pnpm e2e                    # Playwright (includes axe-core a11y checks)
 
-# Database (dbmate)
-pnpm db:migrate             # Apply all pending migrations
-pnpm db:down                # Roll back the last migration
-pnpm db:status              # Migration status
+# Database (Prisma 8)
+pnpm db:migrate             # Apply pending migrations (prisma db update)
+pnpm db:down                # Placeholder — Prisma doesn't support rollback natively
+pnpm db:status              # Placeholder — check migration status via prisma
 pnpm db:new <name>          # Create a new migration file
 
 # Orchestrator

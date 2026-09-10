@@ -1,9 +1,15 @@
-import postgres from 'postgres'
+import 'temporal-polyfill/full/global'
+import 'dotenv/config'
+import postgres from '@prisma/orm-postgres/runtime'
+import pg from 'pg'
+import type { Contract } from '../../src/prisma/contract.d'
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' }
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { JobRow, StepExecutor } from './types'
 
-import { applyMigrations } from '../db/helpers'
 import { type CheckpointerHandle, createCheckpointer, ensureCheckpointerTables } from './checkpointer'
 import { claimNextJob } from './claim'
 import { cancelJob, pauseJob, QueueControlError, resumeJob, retryStep, setJobPriority } from './controls'
@@ -14,7 +20,21 @@ const DB
   = process.env.TEST_DATABASE_URL
     ?? 'postgres://postgres:postgres@localhost:5434/idea_factory_test'
 
-const sql = postgres(DB, { max: 5 })
+const db = postgres<Contract>({ contractJson, url: DB })
+
+async function applyMigrations(dbUrl: string): Promise<void> {
+  const raw = readFileSync(resolve(import.meta.dirname, '../../db/migrations/20260907000000_initial.sql'), 'utf8')
+  const up = raw.split('-- migrate:down')[0].replace('-- migrate:up', '')
+  const idempotent = up
+    .replaceAll('create table ', 'create table if not exists ')
+    .replaceAll('create index ', 'create index if not exists ')
+  const client = new pg.Pool({ connectionString: dbUrl })
+  try {
+    await client.query(idempotent)
+  } finally {
+    await client.end()
+  }
+}
 
 let mainCheckpointer: CheckpointerHandle
 
@@ -94,15 +114,17 @@ function openBarrier(): { promise: Promise<void>, release: () => void } {
 }
 
 async function insertIdea(title: string, priority?: string): Promise<string> {
-  const [row] = priority
-    ? await sql`insert into ideas (title, priority) values (${title}, ${priority}) returning id`
-    : await sql`insert into ideas (title) values (${title}) returning id`
-  return (row as { id: string }).id
+  const idea = priority
+    ? await db.orm.public.Ideas.create({ title, priority })
+    : await db.orm.public.Ideas.create({ title })
+  return idea.id
 }
 
 async function getJob(jobId: string): Promise<JobRow> {
-  const [row] = await sql`select * from queue_jobs where id = ${jobId}`
-  return row as JobRow
+  const row = await db.orm.public.QueueJobs
+    .where(f => f.id.eq(jobId))
+    .first()
+  return row as unknown as JobRow
 }
 
 async function waitFor(check: () => boolean, timeoutMs = 5000, message = 'условие не выполнено'): Promise<void> {
@@ -122,12 +144,18 @@ async function waitForCheckpointStability(threadId: string): Promise<void> {
   let last = -1
   let stable = 0
   const deadline = Date.now() + 3000
-  while (Date.now() < deadline && stable < 2) {
-    const [row] = await sql`select count(*) as n from checkpoints where thread_id = ${threadId}`
-    const n = Number((row as { n: number }).n)
-    stable = n === last ? stable + 1 : 0
-    last = n
-    await new Promise(r => setTimeout(r, 40))
+  const client = new pg.Client({ connectionString: DB })
+  await client.connect()
+  try {
+    while (Date.now() < deadline && stable < 2) {
+      const result = await client.query('SELECT count(*)::int AS n FROM checkpoints WHERE thread_id = $1', [threadId])
+      const n = result.rows[0].n
+      stable = n === last ? stable + 1 : 0
+      last = n
+      await new Promise(r => setTimeout(r, 40))
+    }
+  } finally {
+    await client.end()
   }
 }
 
@@ -135,7 +163,7 @@ async function waitForStep(jobId: string, stepId: string, timeoutMs = 5000): Pro
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const job = await getJob(jobId)
-    if (job.current_step === stepId) {
+    if (job.currentStep === stepId) {
       return
     }
     await new Promise(r => setTimeout(r, 20))
@@ -144,7 +172,7 @@ async function waitForStep(jobId: string, stepId: string, timeoutMs = 5000): Pro
 }
 
 function makeWorker(c: Counters, checkpointer: CheckpointerHandle, overrides?: Record<string, StepExecutor>): AnalysisWorker {
-  return new AnalysisWorker(sql, {
+  return new AnalysisWorker(db, {
     checkpointer,
     executors: countingExecutors(c, overrides),
     retryDelayMs: 20,
@@ -153,15 +181,14 @@ function makeWorker(c: Counters, checkpointer: CheckpointerHandle, overrides?: R
 }
 
 beforeAll(async () => {
-  await sql.unsafe('drop schema public cascade; create schema public;')
-  applyMigrations(DB)
+  await applyMigrations(DB)
   mainCheckpointer = createCheckpointer(DB)
   await ensureCheckpointerTables(mainCheckpointer)
 })
 
 afterAll(async () => {
   await mainCheckpointer.end()
-  await sql.end()
+  await db.close()
 })
 
 describe('AnalysisWorker: базовый прогон', () => {
@@ -169,8 +196,8 @@ describe('AnalysisWorker: базовый прогон', () => {
     const c = counters()
     const worker = makeWorker(c, mainCheckpointer)
     const ideaId = await insertIdea('worker-базовый')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
     expect(job).toBeDefined()
 
     const outcome = await worker.executeJob(job as JobRow)
@@ -178,13 +205,16 @@ describe('AnalysisWorker: базовый прогон', () => {
 
     const after = await getJob(job!.id)
     expect(after.status).toBe('done')
-    expect(after.current_step).toBe('s3')
+    expect(after.currentStep).toBe('s3')
     expect(after.checkpoint?.graph_started).toBe(true)
-    expect(after.finished_at).not.toBeNull()
+    expect(after.finishedAt).not.toBeNull()
 
-    const [idea] = await sql`select funnel_stage, execution_status from ideas where id = ${ideaId}`
-    expect((idea as { funnel_stage: string }).funnel_stage).toBe('decision')
-    expect((idea as { execution_status: string }).execution_status).toBe('paused')
+    const idea = await db.orm.public.Ideas
+      .select('funnelStage', 'executionStatus')
+      .where(f => f.id.eq(ideaId))
+      .first()
+    expect(idea?.funnelStage).toBe('decision')
+    expect(idea?.executionStatus).toBe('paused')
 
     expect(c).toEqual({ s1: 1, s2: 1, s3: 1 })
   })
@@ -207,7 +237,7 @@ describe('рестарт воркера продолжает с последне
       },
       promise: new Promise<void>(() => {}),
     }
-    const workerA = new AnalysisWorker(sql, {
+    const workerA = new AnalysisWorker(db, {
       checkpointer: crashCheckpointer,
       executors: countingExecutors(cA, { t3: barrierExec(crashBarrier, 'A-s3') }),
       retryDelayMs: 20,
@@ -215,8 +245,8 @@ describe('рестарт воркера продолжает с последне
     })
 
     const ideaId = await insertIdea('worker-рестарт')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
 
     void workerA.executeJob(job as JobRow)
     await waitForStep(job!.id, 's2')
@@ -229,7 +259,7 @@ describe('рестарт воркера продолжает с последне
     // Новый воркер с новым чекпоинтером продолжает с последнего корректного шага
     // (claim в режиме восстановления, как при старте воркера после рестарта)
     const workerB = makeWorker(cB, mainCheckpointer)
-    const resumed = await claimNextJob(sql, { resumeRunning: true })
+    const resumed = await claimNextJob(db, { resumeRunning: true })
     expect(resumed?.id).toBe(job!.id)
 
     const outcome = await workerB.executeJob(resumed as JobRow)
@@ -257,13 +287,13 @@ describe('пауза и продолжение (TZ §8)', () => {
     const worker = makeWorker(c, mainCheckpointer, { t3: barrierExec(barrier, 'pause-s3') })
 
     const ideaId = await insertIdea('worker-пауза')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
 
     const execution = worker.executeJob(job as JobRow)
     await waitForStep(job!.id, 's2')
 
-    await pauseJob(sql, job!.id)
+    await pauseJob(db, job!.id)
 
     barrier.release()
     const outcome = await execution
@@ -274,8 +304,8 @@ describe('пауза и продолжение (TZ §8)', () => {
     expect(paused.checkpoint?.graph_started).toBe(true)
 
     // Продолжение: воркер возобновляет с s3, s1/s2 не повторяются
-    await resumeJob(sql, job!.id)
-    const resumedJob = await claimNextJob(sql)
+    await resumeJob(db, job!.id)
+    const resumedJob = await claimNextJob(db)
     expect(resumedJob?.id).toBe(job!.id)
     const outcome2 = await worker.executeJob(resumedJob as JobRow)
     expect(outcome2).toBe('done')
@@ -292,12 +322,12 @@ describe('отмена (TZ §8)', () => {
     const worker = makeWorker(c, mainCheckpointer, { t3: barrierExec(barrier, 'cancel-s3') })
 
     const ideaId = await insertIdea('worker-отмена')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
 
     const execution = worker.executeJob(job as JobRow)
     await waitForStep(job!.id, 's2')
-    await cancelJob(sql, job!.id)
+    await cancelJob(db, job!.id)
 
     barrier.release()
     const outcome = await execution
@@ -307,7 +337,7 @@ describe('отмена (TZ §8)', () => {
     expect(cancelled.status).toBe('cancelled')
     expect(c.s3).toBe(0)
 
-    await expect(resumeJob(sql, job!.id)).rejects.toThrow(QueueControlError)
+    await expect(resumeJob(db, job!.id)).rejects.toThrow(QueueControlError)
   })
 })
 
@@ -324,8 +354,8 @@ describe('сбой шага с повторами (этап 5: таймауты/
     })
 
     const ideaId = await insertIdea('worker-сбой')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
 
     const outcome = await worker.executeJob(job as JobRow)
     expect(outcome).toBe('failed')
@@ -336,8 +366,11 @@ describe('сбой шага с повторами (этап 5: таймауты/
     expect(failed.error).toContain('2 попыток')
     expect(s2Calls).toBe(2) // retries=1 → 2 попытки
 
-    const [idea] = await sql`select execution_status from ideas where id = ${ideaId}`
-    expect((idea as { execution_status: string }).execution_status).toBe('error')
+    const idea = await db.orm.public.Ideas
+      .select('executionStatus')
+      .where(f => f.id.eq(ideaId))
+      .first()
+    expect(idea?.executionStatus).toBe('error')
   })
 })
 
@@ -347,13 +380,13 @@ describe('повтор шага — rewind по чекпоинту (TZ §8)', ()
     const worker = makeWorker(c, mainCheckpointer)
 
     const ideaId = await insertIdea('worker-retry-step')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
     await worker.executeJob(job as JobRow)
     expect(c).toEqual({ s1: 1, s2: 1, s3: 1 })
 
-    await retryStep(sql, job!.id, 's2', steps)
-    const rewound = await claimNextJob(sql)
+    await retryStep(db, job!.id, 's2', steps)
+    const rewound = await claimNextJob(db)
     expect(rewound?.id).toBe(job!.id)
 
     const outcome = await worker.executeJob(rewound as JobRow)
@@ -367,38 +400,43 @@ describe('повтор шага — rewind по чекпоинту (TZ §8)', ()
 
   it('retryStep выполняющейся задачи запрещён', async () => {
     const ideaId = await insertIdea('worker-retry-running')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
-    await expect(retryStep(sql, job!.id, 's1', steps)).rejects.toThrow(QueueControlError)
-    await sql`update queue_jobs set status = 'cancelled' where id = ${job!.id}`
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
+    await expect(retryStep(db, job!.id, 's1', steps)).rejects.toThrow(QueueControlError)
+    await db.orm.public.QueueJobs
+      .where(f => f.id.eq(job!.id))
+      .update({ status: 'cancelled' })
   }, 10_000)
 })
 
 describe('смена приоритета (TZ §8)', () => {
   it('обновляет приоритет задачи и идеи', async () => {
     const ideaId = await insertIdea('worker-priority')
-    await enqueueIdeaAnalysis(sql, ideaId)
-    const job = await claimNextJob(sql)
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
 
-    const updated = await setJobPriority(sql, job!.id, 'high')
+    const updated = await setJobPriority(db, job!.id, 'high')
     expect(updated.priority).toBe('high')
 
-    const [idea] = await sql`select priority from ideas where id = ${ideaId}`
-    expect((idea as { priority: string }).priority).toBe('high')
+    const idea = await db.orm.public.Ideas
+      .select('priority')
+      .where(f => f.id.eq(ideaId))
+      .first()
+    expect(idea?.priority).toBe('high')
   })
 
   it('смена приоритета влияет на порядок очереди', async () => {
     const lowIdea = await insertIdea('prio-low', 'low')
     const highIdea = await insertIdea('prio-high', 'high')
-    const { job: lowJob } = await enqueueIdeaAnalysis(sql, lowIdea)
-    await enqueueIdeaAnalysis(sql, highIdea)
+    const { job: lowJob } = await enqueueIdeaAnalysis(db, lowIdea)
+    await enqueueIdeaAnalysis(db, highIdea)
 
-    await setJobPriority(sql, lowJob.id, 'high')
+    await setJobPriority(db, lowJob.id, 'high')
     // lowIdea поставлена раньше, теперь тоже high → FIFO выбирает её первой
-    const first = await claimNextJob(sql)
-    expect(first?.idea_id).toBe(lowIdea)
-    const second = await claimNextJob(sql)
-    expect(second?.idea_id).toBe(highIdea)
+    const first = await claimNextJob(db)
+    expect(first?.ideaId).toBe(lowIdea)
+    const second = await claimNextJob(db)
+    expect(second?.ideaId).toBe(highIdea)
   })
 })
 
@@ -409,14 +447,17 @@ describe('цикл воркера start/stop', () => {
     const running = worker.start()
 
     const ideaId = await insertIdea('worker-loop')
-    await enqueueIdeaAnalysis(sql, ideaId)
+    await enqueueIdeaAnalysis(db, ideaId)
 
     const deadline = Date.now() + 10_000
     let done = false
     while (Date.now() < deadline && !done) {
-      const [row] = await sql`select status from queue_jobs
-        where idea_id = ${ideaId} order by enqueued_at desc limit 1`
-      if ((row as { status: string } | undefined)?.status === 'done') {
+      const job = await db.orm.public.QueueJobs
+        .select('status')
+        .where(f => f.ideaId.eq(ideaId))
+        .orderBy(f => f.enqueuedAt.desc())
+        .first()
+      if (job?.status === 'done') {
         done = true
       }
       else {

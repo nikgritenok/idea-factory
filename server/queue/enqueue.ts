@@ -1,6 +1,5 @@
 import type { PipelineStep } from '../../config/pipeline'
-import type { Sql } from '../db/types'
-import type { JobRow } from './types'
+import type { JobRow, PrismaDb } from './types'
 
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { QueueControlError } from './controls'
@@ -12,73 +11,100 @@ import { QueueControlError } from './controls'
  * при завершении задачи ключ освобождается для повторного запуска.
  */
 export async function enqueueIdeaAnalysis(
-  sql: Sql,
+  db: PrismaDb,
   ideaId: string,
 ): Promise<{ job: JobRow, created: boolean }> {
-  const [idea] = await sql`
-    select id, funnel_stage, priority from ideas where id = ${ideaId}`
+  const idea = await db.orm.public.Ideas
+    .select('id', 'funnelStage', 'priority')
+    .where((f) => f.id.eq(ideaId))
+    .first()
   if (!idea) {
     throw new QueueControlError(`Идея не найдена: ${ideaId}`, 404)
   }
-  if (idea.funnel_stage === 'archived') {
+  if (idea.funnelStage === 'archived') {
     throw new QueueControlError('Идея в архиве — запуск невозможен', 409)
   }
 
   const key = `analysis:${ideaId}`
 
   // Активная задача уже есть → идемпотентный возврат (повторный клик не создаёт дубль)
-  const [existing] = await sql`
-    select * from queue_jobs
-    where idea_id = ${ideaId} and status in ('queued', 'running', 'paused')
-    order by enqueued_at desc limit 1`
+  const existing = await db.orm.public.QueueJobs
+    .where((f) => f.ideaId.eq(ideaId))
+    .where((f) => f.status.in(['queued', 'running', 'paused']))
+    .orderBy((f) => f.enqueuedAt.desc())
+    .first()
   if (existing) {
-    return { created: false, job: existing as JobRow }
+    return { created: false, job: existing as unknown as JobRow }
   }
 
-  const inserted = await insertJob(sql, ideaId, String(idea.priority), key)
+  const inserted = await insertJob(db, ideaId, String(idea.priority), key)
   return { created: true, job: inserted }
 }
 
-async function insertJob(sql: Sql, ideaId: string, priority: string, key: string): Promise<JobRow> {
+async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: string): Promise<JobRow> {
   // on conflict do nothing: если ключ занят активной задачей, её вернёт идемпотентный
   // SELECT выше; если ключ у завершённой задачи — освобождаем его ниже
-  const rows = await sql`
-    insert into queue_jobs (idea_id, priority, effective_priority, idempotency_key)
-    values (${ideaId}, ${priority}, ${QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase]}, ${key})
-    on conflict (idempotency_key) do nothing
-    returning *`
-  const job = rows[0] as JobRow | undefined
-  if (job) {
-    await sql`
-      update ideas set funnel_stage = 'queued', updated_at = now() where id = ${ideaId}`
-    return job
+  try {
+    const job = await db.orm.public.QueueJobs
+      .select(
+        'id', 'ideaId', 'priority', 'effectivePriority', 'status',
+        'attempts', 'currentStep', 'checkpoint', 'idempotencyKey',
+        'enqueuedAt', 'startedAt', 'finishedAt', 'error',
+      )
+      .create({
+        ideaId,
+        priority,
+        effectivePriority: QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase],
+        idempotencyKey: key,
+      })
+    await db.orm.public.Ideas
+      .where((f) => f.id.eq(ideaId))
+      .update({
+        funnelStage: 'queued',
+        updatedAt: new Date(),
+      })
+    return job as unknown as JobRow
+  }
+  catch {
+    // Conflict — key already exists
   }
 
   // Ключ занят: активная задача → идемпотентный возврат (гонка параллельных кликов),
   // завершённая → освобождаем ключ (версионируем) и вставляем заново
-  return await sql.begin(async (tx) => {
-    const [old] = await tx`
-      select * from queue_jobs where idempotency_key = ${key} limit 1`
-    if (old) {
-      const status = (old as JobRow).status
-      if (status === 'queued' || status === 'running' || status === 'paused') {
-        return old as JobRow
-      }
-      await tx`
-        update queue_jobs set idempotency_key = ${key + ':' + (old as JobRow).id} where id = ${(old as JobRow).id}`
+  const old = await db.orm.public.QueueJobs
+    .where((f) => f.idempotencyKey.eq(key))
+    .first()
+  if (old) {
+    const status = (old as unknown as JobRow).status
+    if (status === 'queued' || status === 'running' || status === 'paused') {
+      return old as unknown as JobRow
     }
-    const retry = await tx`
-      insert into queue_jobs (idea_id, priority, effective_priority, idempotency_key)
-      values (${ideaId}, ${priority}, ${QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase]}, ${key})
-      returning *`
-    const job2 = retry[0] as JobRow | undefined
-    if (!job2) {
-      throw new Error(`Не удалось поставить задачу в очередь: ${ideaId}`)
-    }
-    await tx`
-      update ideas set funnel_stage = 'queued', updated_at = now() where id = ${ideaId}`
-    return job2
-  })
+    await db.orm.public.QueueJobs
+      .where((f) => f.id.eq(old.id))
+      .update({ idempotencyKey: `${key}:${old.id}` })
+  }
+  const job2 = await db.orm.public.QueueJobs
+    .select(
+      'id', 'ideaId', 'priority', 'effectivePriority', 'status',
+      'attempts', 'currentStep', 'checkpoint', 'idempotencyKey',
+      'enqueuedAt', 'startedAt', 'finishedAt', 'error',
+    )
+    .create({
+      ideaId,
+      priority,
+      effectivePriority: QUEUE_CONFIG.priorityBase[priority as keyof typeof QUEUE_CONFIG.priorityBase],
+      idempotencyKey: key,
+    })
+  if (!job2) {
+    throw new Error(`Не удалось поставить задачу в очередь: ${ideaId}`)
+  }
+  await db.orm.public.Ideas
+    .where((f) => f.id.eq(ideaId))
+    .update({
+      funnelStage: 'queued',
+      updatedAt: new Date(),
+    })
+  return job2 as unknown as JobRow
 }
 
 /** Список шагов пайплайна — для API «повтор шага» и проверок */

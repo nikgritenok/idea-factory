@@ -21,6 +21,12 @@
       "sourceType": "well-known",
       "computedHash": "cfaf8a5fe8b8751854afdbf8fc81f864c99f57dac2896251eb3a93ffe3eee564",
       "wellKnownDigest": "sha256:ecded78fbf0708a43d4a833bf0e90e3b9b1cdb6ffb1e13a02b59db036b9bafc7"
+    },
+    "shadcn-vue": {
+      "source": "unovue/shadcn-vue",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn-vue/SKILL.md",
+      "computedHash": "99c23e506f7fa3a1b26dede8e837d067549ba2fbc339ea9030d1563c1f4badf2"
     }
   }
 }

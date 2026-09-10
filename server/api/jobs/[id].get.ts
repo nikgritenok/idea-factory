@@ -4,37 +4,37 @@ import { parseUuid } from '../../utils/schemas'
 // GET /api/jobs/:id — статус задачи очереди (экран «Ход работы», TZ §7a)
 export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const sql = db()
 
-  const [job] = await sql`
-    select j.*, i.title as idea_title, i.funnel_stage, i.execution_status
-    from queue_jobs j
-    join ideas i on i.id = j.idea_id
-    where j.id = ${jobId}`
+  const job = await db.orm.public.QueueJobs
+    .where((f) => f.id.eq(jobId))
+    .first()
   if (!job) {
     throw createError({ statusCode: 404, statusMessage: 'Задача не найдена' })
   }
 
-  const jobRow = job as JobRow & { idea_title: string, funnel_stage: string, execution_status: string }
+  const idea = await db.orm.public.Ideas
+    .select('id', 'title', 'funnelStage', 'executionStatus')
+    .where((f) => f.id.eq(job.ideaId))
+    .first()
 
   return {
     idea: {
-      execution_status: jobRow.execution_status,
-      funnel_stage: jobRow.funnel_stage,
-      id: jobRow.idea_id,
-      title: jobRow.idea_title,
+      execution_status: idea?.executionStatus ?? null,
+      funnel_stage: idea?.funnelStage ?? null,
+      id: job.ideaId,
+      title: idea?.title ?? null,
     },
     job: {
-      attempts: jobRow.attempts,
-      current_step: jobRow.current_step,
-      enqueued_at: jobRow.enqueued_at,
-      error: jobRow.error,
-      finished_at: jobRow.finished_at,
-      id: jobRow.id,
-      idea_id: jobRow.idea_id,
-      priority: jobRow.priority,
-      started_at: jobRow.started_at,
-      status: jobRow.status,
+      attempts: job.attempts,
+      current_step: job.currentStep,
+      enqueued_at: job.enqueuedAt,
+      error: job.error,
+      finished_at: job.finishedAt,
+      id: job.id,
+      idea_id: job.ideaId,
+      priority: job.priority,
+      started_at: job.startedAt,
+      status: job.status,
     },
   }
 })

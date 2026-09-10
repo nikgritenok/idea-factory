@@ -51,13 +51,16 @@ export const DATASET_DEFAULTS = {
   rowCount: 200,
 } as const
 
+/** Тип для переопределений (без as const литеральности) */
+export type DatasetParams = { -readonly [K in keyof typeof DATASET_DEFAULTS]: (typeof DATASET_DEFAULTS)[K] }
+
 const CATEGORIES = ['вопрос', 'жалоба', 'запрос', 'предложение'] as const
 
 /**
  * Генерирует модельный датасет. Тот же seed → тот же датасет (тест детерминизма).
  * Нулевая база / вырожденные случаи проверяются тестами на compute (см. compute.ts).
  */
-export function generateDataset(seed: number, overrides: Partial<typeof DATASET_DEFAULTS> = {}): GeneratedDataset {
+export function generateDataset(seed: number, overrides: Partial<DatasetParams> = {}): GeneratedDataset {
   const params = { ...DATASET_DEFAULTS, ...overrides }
   const rng = mulberry32(seed)
   const rows: TicketRow[] = []

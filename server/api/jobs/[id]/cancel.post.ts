@@ -5,10 +5,9 @@ import { parseUuid } from '../../../utils/schemas'
 // POST /api/jobs/:id/cancel — отмена задачи (TZ §8)
 export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const sql = db()
 
   try {
-    const job = await cancelJob(sql, jobId)
+    const job = await cancelJob(db, jobId)
     return { job }
   }
   catch (error) {

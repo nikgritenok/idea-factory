@@ -9,10 +9,9 @@ export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
   const body = (await readBody(event).catch((): unknown => ({}))) as unknown
   const parsed = RetryStepBodySchema.parse(body)
-  const sql = db()
 
   try {
-    const job = await retryStep(sql, jobId, parsed.step, PIPELINE_STEPS)
+    const job = await retryStep(db, jobId, parsed.step, PIPELINE_STEPS)
     return { job }
   }
   catch (error) {

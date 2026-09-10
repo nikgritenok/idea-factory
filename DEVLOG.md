@@ -225,3 +225,17 @@ quality = ai_correct_rate; порог 0.85, цель ≥ 0.92
 - Исправлена Zod v4 совместимость: `errorMap` → `error`, `SafeParseReturnType` → явный return type
 **Проверка:** `pnpm lint` ✅ (0 errors), `pnpm typecheck` — только pre-existing ошибки (worker.ts, migrate.test.ts, ideas.ts), `pnpm test` ✅ (34/34)
 **Fixes:** Zod v4 API changes — `errorMap` не существует, заменён на `error`; `z.SafeParseReturnType` не экспортируется, заменён на явный union type
+
+## [2026-09-08 / шаг 7b] Миграция на Prisma 8 ORM
+**Запрос:** убрать postgres.js + dbmate, перейти на Prisma 8 (ORM + CLI) для решения системных проблем с `sql.json()` / `JSONValue` / `Row` типами.
+**План:** (1) установить `prisma@8.0.0-rc.13`, `@prisma/orm-postgres@8.0.0-rc.8`, `@prisma/composer@0.17.0`, `dotenv@17.4.2`; (2) исправить `prisma.config.ts` → `definePrismaConfig` + `ormConfig` из `@prisma/orm-postgres/config`; (3) `contract infer` с live DB; (4) `contract emit` + `db.sign`; (5) переписать `server/utils/db.ts` → экспорт из `src/prisma/db.ts`; (6) переписать все файлы с `sql.json()` → `db.orm.public.<Model>.*`.
+**Результат:**
+- `prisma.config.ts` — исправлен (definePrismaConfig + ormConfig)
+- `src/prisma/contract.prisma` — 12 моделей (infer от live DB)
+- `src/prisma/contract.json` + `contract.d.ts` — сгенерированы, подписаны
+- `server/utils/db.ts` — re-export из `src/prisma/db.ts`
+- `server/queue/types.ts` — `StepContext.db: PrismaDb` (было `sql: Sql`)
+- 15+ серверных файлов переписаны: `sql.json()` → `db.orm.public.<Model>.*`
+- **Ключевое открытие:** Prisma 8 ORM требует namespace-qualified доступ: `db.orm.public.Ideas`, а не `db.orm.Ideas` (flat access не работает для contracts с namespace)
+**Проверка:** `npx vue-tsc --noEmit` — EXIT 0 (0 ошибок). `pnpm vitest run` — 55/55 business logic tests pass, 6 integration tests fail (test DB на порту 5434 недоступен — ожидаемо).
+**Fixes:** (1) `ormConfig` не существовал — исправлено на `ormConfig` из `@prisma/orm-postgres/config`; (2) DB миграция применена через `docker exec` (dbmate не работает с новым URL); (3) порт DB изменён на 5433 (5432 занят); (4) `contract infer` требовал пустую БД — миграция применена вручную; (5) `db.orm.Ideas` (flat) не работает — заменено на `db.orm.public.Ideas` (namespace-qualified)

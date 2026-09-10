@@ -7,10 +7,9 @@ export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
   const body = (await readBody(event).catch((): unknown => ({}))) as unknown
   const parsed = PriorityBodySchema.parse(body)
-  const sql = db()
 
   try {
-    const job = await setJobPriority(sql, jobId, parsed.priority)
+    const job = await setJobPriority(db, jobId, parsed.priority)
     return { job }
   }
   catch (error) {

@@ -1,8 +1,13 @@
-import type { Sql } from '../db/types'
-import type { JobCheckpoint, JobRow } from './types'
+import type { JobCheckpoint, JobRow, PrismaDb } from './types'
 
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { effectivePriority } from './priority'
+
+function toEpochMs(value: Date | Temporal.Instant | string): number {
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'string') return Temporal.Instant.from(value).epochMilliseconds
+  return Number(value.epochMilliseconds)
+}
 
 export interface ClaimOptions {
   antiStarvationBump?: number
@@ -23,51 +28,49 @@ export interface ClaimOptions {
  * по времени постановки (enqueued_at asc). Переход queued→running —
  * условный UPDATE (атомарно, без блокировки всего набора кандидатов).
  */
-export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<JobRow | undefined> {
-  return await sql.begin(async (tx) => {
+export async function claimNextJob(db: PrismaDb, opts: ClaimOptions = {}): Promise<JobRow | undefined> {
+  return await db.transaction(async (tx) => {
     // 1. Восстановление (только при старте воркера)
     if (opts.resumeRunning) {
-      const [interrupted] = await tx`
-        select * from queue_jobs
-        where status = 'running'
-        order by started_at asc nulls last, enqueued_at asc
-        limit 1
-        for update skip locked`
+      const interrupted = await tx.orm.public.QueueJobs
+        .where((f) => f.status.eq('running'))
+        .orderBy((f) => f.startedAt.asc())
+        .first()
       if (interrupted) {
-        const [claimed] = await tx`
-          update queue_jobs set attempts = attempts + 1 where id = ${(interrupted as JobRow).id}
-          returning *`
-        return claimed as JobRow
+        const claimed = await tx.orm.public.QueueJobs
+          .where((f) => f.id.eq(interrupted.id))
+          .update({ attempts: interrupted.attempts + 1 })
+        return claimed as unknown as JobRow
       }
       return
     }
 
     // 2. Очередь: расчёт эффективного приоритета с анти-голоданием (TZ §8)
     const now = opts.now ?? new Date()
-    const candidates = await tx`
-      select * from queue_jobs
-      where status = 'queued'
-      order by enqueued_at asc
-      limit 20`
+    const candidates = await tx.orm.public.QueueJobs
+      .where((f) => f.status.eq('queued'))
+      .orderBy((f) => f.enqueuedAt.asc())
+      .limit(20)
+      .all()
 
     let best: JobRow | undefined
     let bestScore = -1
     let bestTime = 0
     for (const row of candidates) {
-      const job = row as JobRow
+      const job = row as unknown as JobRow
       const score = effectivePriority(
         job.priority,
-        job.enqueued_at,
+        job.enqueuedAt,
         now,
         { antiStarvationBump: opts.antiStarvationBump, antiStarvationMinutes: opts.antiStarvationMinutes },
       )
       const isBetter
         = score > bestScore
-          || (score === bestScore && job.enqueued_at.getTime() < bestTime)
+          || (score === bestScore && toEpochMs(job.enqueuedAt) < bestTime)
       if (isBetter) {
         best = job
         bestScore = score
-        bestTime = job.enqueued_at.getTime()
+        bestTime = toEpochMs(job.enqueuedAt)
       }
     }
     if (!best) {
@@ -76,13 +79,16 @@ export async function claimNextJob(sql: Sql, opts: ClaimOptions = {}): Promise<J
 
     // Условный переход queued→running: если задачу забрал параллельный воркер,
     // UPDATE не совпадёт — возвращаем undefined (не выдаём дубль)
-    const [claimed] = await tx`
-      update queue_jobs
-      set status = 'running', started_at = now(), attempts = attempts + 1,
-          effective_priority = ${bestScore}
-      where id = ${best.id} and status = 'queued'
-      returning *`
-    return claimed as JobRow | undefined
+    const claimed = await tx.orm.public.QueueJobs
+      .where((f) => f.id.eq(best.id))
+      .where((f) => f.status.eq('queued'))
+      .update({
+        status: 'running',
+        startedAt: new Date(),
+        attempts: best.attempts + 1,
+        effectivePriority: bestScore,
+      })
+    return claimed as unknown as JobRow | undefined
   })
 }
 

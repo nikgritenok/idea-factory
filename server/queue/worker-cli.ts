@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const handle = createCheckpointer()
   await ensureCheckpointerTables(handle)
 
-  const worker = new AnalysisWorker(db(), { checkpointer: handle, steps: PIPELINE_STEPS })
+  const worker = new AnalysisWorker(db, { checkpointer: handle, steps: PIPELINE_STEPS })
   const loop = worker.start()
 
   const shutdown = async (signal: string): Promise<void> => {

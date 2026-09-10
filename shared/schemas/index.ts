@@ -82,16 +82,16 @@ export type JobCheckpoint = z.infer<typeof JobCheckpointSchema>
 export const JobRowSchema = z.object({
   attempts: z.number().int().nonnegative(),
   checkpoint: JobCheckpointSchema.nullable(),
-  current_step: z.string().nullable(),
-  effective_priority: z.number().int(),
-  enqueued_at: z.coerce.date(),
+  currentStep: z.string().nullable(),
+  effectivePriority: z.number().int(),
+  enqueuedAt: z.coerce.date(),
   error: z.string().nullable(),
-  finished_at: z.coerce.date().nullable(),
+  finishedAt: z.coerce.date().nullable(),
   id: z.string().uuid(),
-  idea_id: z.string().uuid(),
-  idempotency_key: z.string().nullable(),
+  ideaId: z.string().uuid(),
+  idempotencyKey: z.string().nullable(),
   priority: PrioritySchema,
-  started_at: z.coerce.date().nullable(),
+  startedAt: z.coerce.date().nullable(),
   status: JobStatusSchema,
 })
 export type JobRow = z.infer<typeof JobRowSchema>

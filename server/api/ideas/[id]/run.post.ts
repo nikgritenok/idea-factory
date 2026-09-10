@@ -7,10 +7,9 @@ import { parseUuid } from '../../../utils/schemas'
 // Идемпотентно: повторный клик возвращает существующую активную задачу, не создавая дубль.
 export default defineEventHandler(async (event) => {
   const ideaId = parseUuid(getRouterParam(event, 'id'))
-  const sql = db()
 
   try {
-    const { created, job } = await enqueueIdeaAnalysis(sql, ideaId)
+    const { created, job } = await enqueueIdeaAnalysis(db, ideaId)
     setResponseStatus(event, created ? 201 : 200)
     return { created, job }
   }

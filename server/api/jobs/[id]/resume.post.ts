@@ -5,10 +5,9 @@ import { parseUuid } from '../../../utils/schemas'
 // POST /api/jobs/:id/resume — продолжение задачи с чекпоинта (TZ §8)
 export default defineEventHandler(async (event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const sql = db()
 
   try {
-    const job = await resumeJob(sql, jobId)
+    const job = await resumeJob(db, jobId)
     return { job }
   }
   catch (error) {

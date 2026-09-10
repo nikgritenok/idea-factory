@@ -3,7 +3,7 @@
  * Вызывает POST /validate с протоколом прогона.
  */
 
-import type { Sql } from '../db/types'
+import { db } from '../utils/db'
 import type { RunCallRecord } from '../queue/run-protocol'
 
 const VALIDATOR_URL = process.env.VALIDATOR_URL ?? 'http://localhost:3001'
@@ -35,7 +35,6 @@ export class ValidatorError extends Error {
  */
 export async function validateRules(
   input: ValidateInput,
-  sql?: Sql,
   runId?: string,
 ): Promise<ValidateResult> {
   const started = Date.now()
@@ -63,8 +62,8 @@ export async function validateRules(
     response = { valid: false, errors: [error] }
   }
 
-  // Запись в run_calls, если передан sql и runId
-  if (sql && runId) {
+  // Запись в run_calls, если передан runId
+  if (runId) {
     const callRecord: RunCallRecord = {
       component: 'validator',
       componentVersion: '1.0.0',
@@ -75,26 +74,23 @@ export async function validateRules(
       error,
     }
 
-    await sql`
-      INSERT INTO run_calls (run_id, component, component_version, request, response, duration_ms, ok, error)
-      VALUES (
-        ${runId},
-        ${callRecord.component},
-        ${callRecord.componentVersion},
-        ${sql.json(callRecord.request)},
-        ${sql.json(callRecord.response)},
-        ${callRecord.durationMs},
-        ${callRecord.ok},
-        ${callRecord.error ?? null}
-      )
-    `
+    await db.orm.public.RunCalls.create({
+      runId,
+      component: callRecord.component,
+      componentVersion: callRecord.componentVersion,
+      request: callRecord.request,
+      response: callRecord.response,
+      durationMs: callRecord.durationMs,
+      ok: callRecord.ok,
+      error: callRecord.error ?? null,
+    })
   }
 
   if (!ok) {
-    throw new ValidatorError(error)
+    throw new ValidatorError(error ?? 'Неизвестная ошибка валидатора')
   }
 
-  return response!
+  return response as ValidateResult
 }
 
 /**

@@ -3,12 +3,10 @@ import { countActiveIdeas, titleFromTranscript } from '../../utils/ideas'
 import { IDEA_LIMIT_ACTIVE, IdeaCreateSchema } from '../../utils/schemas'
 
 export default defineEventHandler(async (event) => {
-  const sql = db()
-
   const body = await readBody(event) as unknown
   const parsed = IdeaCreateSchema.parse(body)
 
-  const activeCount = await countActiveIdeas(sql)
+  const activeCount = await countActiveIdeas()
   if (activeCount >= IDEA_LIMIT_ACTIVE) {
     throw createError({
       statusCode: 409,
@@ -18,15 +16,30 @@ export default defineEventHandler(async (event) => {
 
   const title = titleFromTranscript(parsed.transcript)
 
-  const rows = await sql`
-    insert into ideas (title, source_transcript, source_kind, priority, funnel_stage, execution_status)
-    values (${title}, ${parsed.transcript}, ${parsed.source_kind}, ${parsed.priority}, 'draft', 'paused')
-    returning *`
-  const idea = IdeaRowSchema.parse(rows[0])
+  const idea = await db.orm.public.Ideas
+    .select(
+      'id', 'title', 'sourceTranscript', 'sourceKind',
+      'structuredIdea', 'problem', 'audience', 'value',
+      'constraints', 'assumptions', 'priority', 'funnelStage',
+      'executionStatus', 'originalProcessDescription',
+      'baselineMetrics', 'expectedEffect',
+      'createdAt', 'updatedAt', 'version',
+    )
+    .create({
+      title,
+      sourceTranscript: parsed.transcript,
+      sourceKind: parsed.source_kind,
+      priority: parsed.priority,
+      funnelStage: 'draft',
+      executionStatus: 'paused',
+    })
 
-  await sql`
-    insert into idea_versions (idea_id, version, snapshot, changed_fields)
-    values (${idea.id}, 1, ${sql.json(idea)}, ${sql.json({ created: true })})`
+  await db.orm.public.IdeaVersions.create({
+    ideaId: idea.id,
+    version: 1,
+    snapshot: idea,
+    changedFields: { created: true },
+  })
 
   setResponseStatus(event, 201)
   return { idea }

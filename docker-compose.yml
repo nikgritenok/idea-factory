@@ -3,44 +3,18 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       POSTGRES_DB: ${POSTGRES_DB:-idea_factory}
     volumes:
       - db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 3s
       retries: 10
-
-  web:
-    build: .
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-idea_factory}
-      RUN_MIGRATIONS: "true"
-    ports:
-      - "3000:3000"
-
-  worker:
-    build: .
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-idea_factory}
-      WORKER_MODE: "true"
-    command: ["node", ".output/server/index.mjs", "--worker"]
-    # persistent worker: переживает закрытие вкладки, продолжает с последнего шага (TZ §8)
-
-  validator:
-    build: ./services/validator
-    # Микросервис-валидатор правил (TZ §1/§11): изолированный контейнер,
-    # HTTP-контракт POST /validate + GET /version, без доступа к ключам оркестратора
-    ports:
-      - "3001:3001"
 
 volumes:
   db_data:

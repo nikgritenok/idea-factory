@@ -7,7 +7,7 @@
 import type { CalculationResult, ModelParams } from './model'
 
 import { decide } from './decision'
-import { generateDataset, DATASET_DEFAULTS, datasetSummary, type GeneratedDataset } from './dataset'
+import { generateDataset, datasetSummary, type DatasetParams, type GeneratedDataset } from './dataset'
 import { computeScenarios, computeSensitivity, computeVariant, MODEL_FORMULA, MODEL_VERSION, PARAM_DEFAULTS } from './model'
 import { seedFromString } from './prng'
 
@@ -17,7 +17,7 @@ export interface EfficiencyInput {
   /** Переопределение параметров модели (для чувствительности и тестов) */
   params?: Partial<ModelParams>
   /** Переопределение параметров датасета (нулевая база, объём и т.д.) */
-  datasetParams?: Partial<typeof DATASET_DEFAULTS>
+  datasetParams?: Partial<DatasetParams>
   /** Явный seed; по умолчанию — стабильный хеш транскрипта */
   seed?: number
 }

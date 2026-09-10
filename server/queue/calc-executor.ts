@@ -21,19 +21,16 @@ export const calcExecutor = async (ctx: StepContext): Promise<StepResult> => {
   const output = computeEfficiency({ ideaTranscript: getIdeaTranscript(ctx) })
 
   // Сохраняем расчёт в таблицу calculations (TZ §5: хранить формулу/версию/входы/параметры/результат)
-  await ctx.sql`
-    insert into calculations (idea_id, model_version, formula, params, seed, input_summary, result, warnings)
-    values (
-      ${ctx.ideaId},
-      ${output.result.modelVersion},
-      ${output.result.formula.join('; ')},
-      ${ctx.sql.json(output.result.mainVariant)},
-      ${output.seed},
-      ${ctx.sql.json(output.inputSummary)},
-      ${ctx.sql.json({ result: output.result, decision: output.decision })},
-      ${ctx.sql.json(output.result.warnings)}
-    )
-  `
+  await ctx.db.orm.public.Calculations.create({
+    ideaId: ctx.ideaId,
+    modelVersion: output.result.modelVersion,
+    formula: output.result.formula.join('; '),
+    params: output.result.mainVariant,
+    seed: BigInt(output.seed),
+    inputSummary: output.inputSummary,
+    result: { result: output.result, decision: output.decision },
+    warnings: output.result.warnings,
+  })
 
   return {
     output: {

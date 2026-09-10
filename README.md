@@ -16,16 +16,14 @@ docker run -d --name idea-factory-test-db \
 pnpm test
 ```
 
-## Миграции (dbmate)
+## Миграции (Prisma 8)
 
 ```bash
-pnpm run db:migrate   # применить все миграции
-pnpm run db:rollback  # откатить последнюю миграцию
-pnpm run db:status    # статус миграций
-pnpm run db:new       # создать новую миграцию
+pnpm run db:migrate   # применить миграции (prisma db update)
+pnpm run db:sign      # подписать контракт после изменений
 ```
 
-Миграции применяются автоматически при старте `web` (`RUN_MIGRATIONS=true`).
+Миграции применяются автоматически при старте `web`.
 
 ## Прод (docker-compose)
 

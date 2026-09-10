@@ -119,8 +119,8 @@ export function createLlmExecutor(roleId: string) {
 
     let result: Awaited<ReturnType<typeof callFn>>
 
-    if (ctx.sql && runId) {
-      result = await withRunCall(ctx.sql, runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn)
+    if (ctx.db && runId) {
+      result = await withRunCall(runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn)
     }
     else {
       result = await callFn()

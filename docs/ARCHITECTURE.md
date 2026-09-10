@@ -6,9 +6,9 @@
 |------|-----------|------------|
 | Framework | Nuxt 4.5 (Nitro) | Full-stack SSR/CSR, файловый роутинг, server routes |
 | Language | TypeScript | Строгая типизация, общая кодовая база |
-| ORM | postgres.js | Лёгкий SQL-first драйвер для PostgreSQL |
+| ORM | Prisma 8 (orm-postgres) | Типобезопасный ORM с SQL-first контрактами |
 | Database | PostgreSQL 16 | Основная реляционная БД |
-| Migrations | dbmate | SQL-миграции с rollback (файлы в `db/migrations/`) |
+| Migrations | Prisma 8 | SQL-миграции через Prisma (файлы в `prisma/`) |
 | Validation | Zod | Валидация данных на границах (API, route params, env vars) |
 | AI/Orchestration | LangGraph.js 1.4 + PostgresSaver | StateGraph для пайплайна анализа, checkpointing в Postgres |
 | State | Pinia | Управление состоянием на клиенте |
@@ -67,7 +67,7 @@ e2e/                  # Playwright E2E-тесты
 config/               # Конфиги пайплайна (steps, лимиты, очереди)
   roles/              # Конфиги ролей (промпты, параметры, Zod-схемы)
   components/         # Каталог компонентов (LLM, STT, валидатор)
-db/                   # SQL-миграции (dbmate)
+src/prisma/           # Prisma 8 contract, db.ts entry point
 docs/                 # Документация
 
 services/             # Микросервисы (изолированные контейнеры)

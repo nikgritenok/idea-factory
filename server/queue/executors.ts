@@ -1,5 +1,4 @@
 import type { ExecutorKind } from '../../config/pipeline'
-import type { Sql } from '../db/types'
 import type { StepExecutor } from './types'
 
 import { createLlmExecutor } from './llm-executor'
@@ -87,4 +86,3 @@ export function registerExecutor(kind: ExecutorKind, exec: StepExecutor): void {
 }
 
 // Утилита для тестов: посчитать таблицу идей без лишних запросов
-export type TestSql = Sql

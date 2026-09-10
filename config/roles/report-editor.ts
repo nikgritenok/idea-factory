@@ -13,20 +13,23 @@ export const reportEditorRole = {
 
   /**
    * Логика сборки отчёта (реализуется в report-builder.ts, не здесь).
-   * Этот конфиг — для документации и لل.progressBar.
+   * Этот конфиг — для документации и progressBar.
    */
-  buildLogic: (results: Record<string, unknown>) => ({
-    summary: {
-      idea: results.idea_analysis,
-      recommendation: results.critic_review,
-    },
-    market: results.market_research,
-    strategy: results.strategy,
-    efficiency: results.efficiency_model,
-    critic: results.critic_review,
-    meta: {
-      pipelineVersion: results.orchestrator_plan?.pipelineVersion ?? 'v1',
-      generatedAt: new Date().toISOString(),
-    },
-  }),
+  buildLogic: (results: Record<string, unknown>) => {
+    const orchestrator = results.orchestrator_plan as { pipelineVersion?: string } | undefined
+    return {
+      summary: {
+        idea: results.idea_analysis,
+        recommendation: results.critic_review,
+      },
+      market: results.market_research,
+      strategy: results.strategy,
+      efficiency: results.efficiency_model,
+      critic: results.critic_review,
+      meta: {
+        pipelineVersion: orchestrator?.pipelineVersion ?? 'v1',
+        generatedAt: new Date().toISOString(),
+      },
+    }
+  },
 }

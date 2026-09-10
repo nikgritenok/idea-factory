@@ -1,0 +1,223 @@
+// use prisma-next
+// Contract inferred from the live database schema. Edit as needed, then run `prisma contract emit`.
+
+model Ideas {
+  id                         Uuid           @id(map: "ideas_pkey") @default(dbgenerated("gen_random_uuid()"))
+  title                      String
+  sourceTranscript           String?        @map("source_transcript")
+  sourceKind                 String         @default("text") @map("source_kind")
+  structuredIdea             Jsonb?         @map("structured_idea")
+  problem                    String?
+  audience                   String?
+  value                      String?
+  constraints                Jsonb?
+  assumptions                Jsonb?
+  priority                   String         @default("medium")
+  funnelStage                String         @default("draft") @map("funnel_stage")
+  executionStatus            String         @default("paused") @map("execution_status")
+  originalProcessDescription String?        @map("original_process_description")
+  baselineMetrics            Jsonb?         @map("baseline_metrics")
+  expectedEffect             Jsonb?         @map("expected_effect")
+  createdAt                  TimestamptzString    @default(now()) @map("created_at")
+  updatedAt                  TimestamptzString    @default(now()) @map("updated_at")
+  version                    Int            @default(1)
+  agentOutputs               AgentOutputs[]
+  audioFiles                 AudioFiles[]
+  calculations               Calculations[]
+  ideaVersions               IdeaVersions[]
+  queueJobs                  QueueJobs[]
+  reports                    Reports[]
+  runs                       Runs[]
+  sources                    Sources[]
+
+  @@index([funnelStage], map: "ideas_funnel_stage_idx")
+  @@index([priority, createdAt], map: "ideas_priority_created_idx")
+  @@check(expression: "(execution_status = ANY (ARRAY['running'::text, 'paused'::text, 'error'::text, 'waiting_for_data'::text]))", map: "ideas_execution_status_check")
+  @@check(expression: "(funnel_stage = ANY (ARRAY['draft'::text, 'queued'::text, 'research'::text, 'critical_evaluation'::text, 'decision'::text, 'mvp_in_progress'::text, 'mvp_ready'::text, 'archived'::text]))", map: "ideas_funnel_stage_check")
+  @@check(expression: "(priority = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))", map: "ideas_priority_check")
+  @@check(expression: "(source_kind = ANY (ARRAY['text'::text, 'voice'::text]))", map: "ideas_source_kind_check")
+  @@check(expression: "(length(title) <= 500)", map: "ideas_title_check")
+  @@map("ideas")
+}
+
+model AgentOutputs {
+  id              Uuid        @id(map: "agent_outputs_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId          Uuid        @map("idea_id")
+  runId           Uuid?       @map("run_id")
+  role            String
+  output          Jsonb?
+  formatValid     Boolean     @default(false) @map("format_valid")
+  validationError String?     @map("validation_error")
+  outdated        Boolean     @default(false)
+  createdAt       TimestamptzString @default(now()) @map("created_at")
+  idea            Ideas       @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "agent_outputs_idea_id_fkey", index: false)
+
+  @@index([ideaId, role, createdAt], map: "agent_outputs_idea_role_idx")
+  @@map("agent_outputs")
+}
+
+model AudioFiles {
+  id          Uuid            @id(map: "audio_files_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId      Uuid            @map("idea_id")
+  storagePath String          @map("storage_path")
+  mimeType    String          @map("mime_type")
+  durationSec Numeric(10, 2)? @map("duration_sec")
+  sizeBytes   BigInt?         @map("size_bytes")
+  createdAt   TimestamptzString     @default(now()) @map("created_at")
+  idea        Ideas           @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "audio_files_idea_id_fkey")
+
+  @@index([ideaId], map: "audio_files_idea_idx")
+  @@map("audio_files")
+}
+
+model Calculations {
+  id           Uuid        @id(map: "calculations_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId       Uuid        @map("idea_id")
+  runIds       Jsonb?      @map("run_ids")
+  modelVersion String      @map("model_version")
+  formula      String
+  params       Jsonb
+  seed         BigInt
+  inputSummary Jsonb       @map("input_summary")
+  result       Jsonb
+  warnings     Jsonb?
+  createdAt    TimestamptzString @default(now()) @map("created_at")
+  idea         Ideas       @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "calculations_idea_id_fkey", index: false)
+
+  @@index([ideaId, createdAt], map: "calculations_idea_idx")
+  @@map("calculations")
+}
+
+model ConfigVersions {
+  id        Uuid        @id(map: "config_versions_pkey") @default(dbgenerated("gen_random_uuid()"))
+  version   String      @unique(map: "config_versions_version_key")
+  config    Jsonb
+  createdAt TimestamptzString @default(now()) @map("created_at")
+
+  @@map("config_versions")
+}
+
+model Datasets {
+  id            Uuid        @id(map: "datasets_pkey") @default(dbgenerated("gen_random_uuid()"))
+  name          String
+  description   String?
+  units         String?
+  period        String?
+  rows          Jsonb
+  rowCount      Int         @map("row_count")
+  missingPolicy String?     @map("missing_policy")
+  isFixture     Boolean     @default(false) @map("is_fixture")
+  createdAt     TimestamptzString @default(now()) @map("created_at")
+
+  @@map("datasets")
+}
+
+model IdeaVersions {
+  id            Uuid        @id(map: "idea_versions_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId        Uuid        @map("idea_id")
+  version       Int
+  snapshot      Jsonb
+  changedFields Jsonb?      @map("changed_fields")
+  createdAt     TimestamptzString @default(now()) @map("created_at")
+  idea          Ideas       @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "idea_versions_idea_id_fkey", index: false)
+
+  @@unique([ideaId, version], map: "idea_versions_idea_id_version_key")
+  @@index([ideaId, version], map: "idea_versions_idea_idx")
+  @@map("idea_versions")
+}
+
+model QueueJobs {
+  id                Uuid         @id(map: "queue_jobs_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId            Uuid         @map("idea_id")
+  priority          String       @default("medium")
+  effectivePriority Int          @default(0) @map("effective_priority")
+  status            String       @default("queued")
+  attempts          Int          @default(0)
+  currentStep       String?      @map("current_step")
+  checkpoint        Jsonb?
+  idempotencyKey    String?      @unique(map: "queue_jobs_idempotency_key_key") @map("idempotency_key")
+  enqueuedAt        TimestamptzString  @default(now()) @map("enqueued_at")
+  startedAt         TimestamptzString? @map("started_at")
+  finishedAt        TimestamptzString? @map("finished_at")
+  error             String?
+  idea              Ideas        @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "queue_jobs_idea_id_fkey", index: false)
+
+  @@index([ideaId, enqueuedAt], map: "queue_jobs_idea_idx")
+  @@index([status, effectivePriority, enqueuedAt], map: "queue_jobs_pick_idx")
+  @@check(expression: "(priority = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))", map: "queue_jobs_priority_check")
+  @@check(expression: "(status = ANY (ARRAY['queued'::text, 'running'::text, 'paused'::text, 'done'::text, 'cancelled'::text, 'failed'::text]))", map: "queue_jobs_status_check")
+  @@map("queue_jobs")
+}
+
+model Reports {
+  id             Uuid           @id(map: "reports_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId         Uuid           @map("idea_id")
+  version        Int
+  sections       Jsonb
+  recommendation String?
+  score          Numeric(4, 1)?
+  stopFactors    Jsonb?         @map("stop_factors")
+  outdated       Boolean        @default(false)
+  createdAt      TimestamptzString    @default(now()) @map("created_at")
+  idea           Ideas          @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "reports_idea_id_fkey", index: false)
+
+  @@unique([ideaId, version], map: "reports_idea_id_version_key")
+  @@index([ideaId, version], map: "reports_idea_idx")
+  @@check(expression: "(recommendation = ANY (ARRAY['develop'::text, 'validate_first'::text, 'postpone'::text, 'reject'::text, 'insufficient_data'::text]))", map: "reports_recommendation_check")
+  @@map("reports")
+}
+
+model Runs {
+  id                Uuid         @id(map: "runs_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId            Uuid         @map("idea_id")
+  datasetId         Uuid?        @map("dataset_id")
+  variant           String
+  componentVersions Jsonb?       @map("component_versions")
+  configVersion     String?      @map("config_version")
+  status            String       @default("running")
+  isFixture         Boolean      @default(false) @map("is_fixture")
+  startedAt         TimestamptzString  @default(now()) @map("started_at")
+  finishedAt        TimestamptzString? @map("finished_at")
+  error             String?
+  runCalls          RunCalls[]
+  idea              Ideas        @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "runs_idea_id_fkey", index: false)
+
+  @@index([ideaId, startedAt], map: "runs_idea_idx")
+  @@check(expression: "(status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'partial'::text]))", map: "runs_status_check")
+  @@map("runs")
+}
+
+model RunCalls {
+  id               Uuid        @id(map: "run_calls_pkey") @default(dbgenerated("gen_random_uuid()"))
+  runId            Uuid        @map("run_id")
+  component        String
+  componentVersion String?     @map("component_version")
+  request          Jsonb?
+  response         Jsonb?
+  durationMs       Int?        @map("duration_ms")
+  ok               Boolean     @default(true)
+  error            String?
+  createdAt        TimestamptzString @default(now()) @map("created_at")
+  run              Runs        @relation(fields: [runId], references: [id], onDelete: Cascade, map: "run_calls_run_id_fkey", index: false)
+
+  @@index([runId, createdAt], map: "run_calls_run_idx")
+  @@map("run_calls")
+}
+
+model Sources {
+  id            Uuid         @id(map: "sources_pkey") @default(dbgenerated("gen_random_uuid()"))
+  ideaId        Uuid         @map("idea_id")
+  reportVersion Int?         @map("report_version")
+  url           String
+  title         String?
+  publishedAt   TimestamptzString? @map("published_at")
+  accessedAt    TimestamptzString  @default(now()) @map("accessed_at")
+  supports      String?
+  evidenceKind  String       @default("fact") @map("evidence_kind")
+  createdAt     TimestamptzString  @default(now()) @map("created_at")
+  idea          Ideas        @relation(fields: [ideaId], references: [id], onDelete: Cascade, map: "sources_idea_id_fkey")
+
+  @@index([ideaId], map: "sources_idea_idx")
+  @@check(expression: "(evidence_kind = ANY (ARRAY['fact'::text, 'estimate'::text, 'forecast'::text, 'simulation'::text, 'synthetic'::text]))", map: "sources_evidence_kind_check")
+  @@map("sources")
+}

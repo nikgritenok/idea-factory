@@ -23,11 +23,18 @@ export function antiStarvationPriority(
 
 export function effectivePriority(
   base: QueuePriority,
-  enqueuedAt: Date,
-  now: Date,
+  enqueuedAt: Date | Temporal.Instant | string,
+  now: Date | Temporal.Instant,
   cfg?: { antiStarvationMinutes?: number, antiStarvationBump?: number },
 ): number {
-  const waitedMinutes = Math.max(0, (now.getTime() - enqueuedAt.getTime()) / 60_000)
+  const enqueuedMs
+    = enqueuedAt instanceof Date
+      ? enqueuedAt.getTime()
+      : typeof enqueuedAt === 'string'
+        ? Temporal.Instant.from(enqueuedAt).epochMilliseconds
+        : enqueuedAt.epochMilliseconds
+  const nowMs = now instanceof Date ? now.getTime() : now.epochMilliseconds
+  const waitedMinutes = Math.max(0, (nowMs - enqueuedMs) / 60_000)
   return antiStarvationPriority(base, waitedMinutes, cfg)
 }
 

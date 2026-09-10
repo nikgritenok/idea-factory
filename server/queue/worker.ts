@@ -1,9 +1,8 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
 
 import type { PipelineStep } from '../../config/pipeline'
-import type { Sql } from '../db/types'
 import type { CheckpointerHandle } from './checkpointer'
-import type { JobCheckpoint, JobRow, StepExecutor } from './types'
+import type { JobCheckpoint, JobRow, PrismaDb, StepExecutor } from './types'
 
 import { PIPELINE_VERSION } from '../../config/pipeline'
 import { claimNextJob, type ClaimOptions, initialCheckpoint } from './claim'
@@ -45,15 +44,15 @@ export type JobOutcome = 'cancelled' | 'done' | 'failed' | 'paused'
  * Пауза/отмена проверяются на границе шагов.
  */
 export class AnalysisWorker {
-  private readonly sql: Sql
+  private readonly db: PrismaDb
   private readonly opts: Required<Pick<WorkerOptions, 'pollIntervalMs' | 'retryDelayMs'>> & WorkerOptions
   private stopped = false
   private looping: null | Promise<void> = null
   /** Сигнал отмены текущей задачи — доставляется в исполняющийся шаг */
   private currentSignal: AbortSignal | null = null
 
-  constructor(sql: Sql, opts: WorkerOptions) {
-    this.sql = sql
+  constructor(db: PrismaDb, opts: WorkerOptions) {
+    this.db = db
     this.opts = { pollIntervalMs: 2000, retryDelayMs: 200, ...opts }
   }
 
@@ -83,7 +82,7 @@ export class AnalysisWorker {
     // Восстановление после рестарта (TZ §8): продолжаем прерванные задачи
     // с последнего корректного шага, не с нуля
     for (let i = 0; i < 50 && !this.stopped; i++) {
-      const interrupted = await claimNextJob(this.sql, { ...this.opts.claim, resumeRunning: true })
+      const interrupted = await claimNextJob(this.db, { ...this.opts.claim, resumeRunning: true })
       if (!interrupted) {
         break
       }
@@ -91,7 +90,7 @@ export class AnalysisWorker {
     }
 
     while (!this.stopped) {
-      const job = await claimNextJob(this.sql, this.opts.claim)
+      const job = await claimNextJob(this.db, this.opts.claim)
       if (!job) {
         await sleep(this.opts.pollIntervalMs)
         continue
@@ -138,7 +137,7 @@ export class AnalysisWorker {
     const streamInput: null | PipelineStateT = cp.graph_started
       ? null
       : {
-          ideaId: job.idea_id,
+          ideaId: job.ideaId,
           jobId: job.id,
           pipelineVersion: PIPELINE_VERSION,
           runId,
@@ -200,7 +199,7 @@ export class AnalysisWorker {
           // Завершаем прогон как failed
           if (runId) {
             const { finishRun } = await import('./run-protocol')
-            await finishRun(this.sql, runId, 'failed', error instanceof Error ? error.message : String(error))
+            await finishRun(runId, 'failed', error instanceof Error ? error.message : String(error))
           }
           await this.markFailed(job, cp, completedStep, error)
           return 'failed'
@@ -216,7 +215,7 @@ export class AnalysisWorker {
       // Завершаем прогон как failed при отмене
       if (runId) {
         const { finishRun } = await import('./run-protocol')
-        await finishRun(this.sql, runId, 'failed', 'Cancelled')
+        await finishRun(runId, 'failed', 'Cancelled')
       }
       await this.markCancelled(job)
       return 'cancelled'
@@ -226,16 +225,21 @@ export class AnalysisWorker {
     // Завершаем прогон как completed
     if (runId) {
       const { finishRun } = await import('./run-protocol')
-      await finishRun(this.sql, runId, 'completed')
+      await finishRun(runId, 'completed')
     }
-    await this.sql`
-      update queue_jobs
-      set status = 'done', finished_at = now(), checkpoint = ${this.sql.json({ ...cp, graph_started: true, last_step: completedStep } satisfies JobCheckpoint)}
-      where id = ${job.id}`
-    await this.sql`
-      update ideas
-      set execution_status = 'paused', updated_at = now()
-      where id = ${job.idea_id}`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(job.id))
+      .update({
+        status: 'done',
+        finishedAt: new Date(),
+        checkpoint: { ...cp, graph_started: true, last_step: completedStep } satisfies JobCheckpoint,
+      })
+    await this.db.orm.public.Ideas
+      .where((f) => f.id.eq(job.ideaId))
+      .update({
+        executionStatus: 'paused',
+        updatedAt: new Date(),
+      })
     return 'done'
   }
 
@@ -267,14 +271,19 @@ export class AnalysisWorker {
     }
 
     const lastStep = this.opts.steps.at(-1)?.id ?? null
-    await this.sql`
-      update queue_jobs
-      set status = 'done', finished_at = now(), checkpoint = ${this.sql.json({ ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint)}
-      where id = ${job.id}`
-    await this.sql`
-      update ideas
-      set execution_status = 'paused', updated_at = now()
-      where id = ${job.idea_id}`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(job.id))
+      .update({
+        status: 'done',
+        finishedAt: new Date(),
+        checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
+      })
+    await this.db.orm.public.Ideas
+      .where((f) => f.id.eq(job.ideaId))
+      .update({
+        executionStatus: 'paused',
+        updatedAt: new Date(),
+      })
     return 'done'
   }
 
@@ -301,7 +310,7 @@ export class AnalysisWorker {
           ideaId: state.ideaId,
           jobId: state.jobId,
           signal: this.currentSignal ?? new AbortController().signal,
-          sql: this.sql,
+          db: this.db,
           state: state.stepResults,
           step,
         }),
@@ -317,8 +326,10 @@ export class AnalysisWorker {
   }
 
   private async readStatus(jobId: string): Promise<JobRow['status'] | undefined> {
-    const [row] = await this.sql`
-      select status from queue_jobs where id = ${jobId}`
+    const row = await this.db.orm.public.QueueJobs
+      .select('status')
+      .where((f) => f.id.eq(jobId))
+      .first()
     return (row as { status: JobRow['status'] } | undefined)?.status
   }
 
@@ -329,31 +340,60 @@ export class AnalysisWorker {
     funnelStageAfter: PipelineStep['funnelStageAfter'],
   ): Promise<void> {
     const nextCp = { ...cp, graph_started: true, last_step: stepId } satisfies JobCheckpoint
-    await this.sql`
-      update queue_jobs
-      set current_step = ${stepId}, checkpoint = ${this.sql.json(nextCp)}
-      where id = ${jobId}`
-    const stageSet = funnelStageAfter
-      ? this.sql`funnel_stage = ${funnelStageAfter}, execution_status = 'running'`
-      : this.sql`execution_status = 'running'`
-    await this.sql`
-      update ideas
-      set ${stageSet}, updated_at = now()
-      where id = (select idea_id from queue_jobs where id = ${jobId})`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(jobId))
+      .update({
+        currentStep: stepId,
+        checkpoint: nextCp,
+      })
+
+    // Обновляем идею: стадия + execution_status
+    const job = await this.db.orm.public.QueueJobs
+      .select('ideaId')
+      .where((f) => f.id.eq(jobId))
+      .first()
+    if (job) {
+      const updateData: { funnelStage?: string, executionStatus: string, updatedAt: Date } = {
+        executionStatus: 'running',
+        updatedAt: new Date(),
+      }
+      if (funnelStageAfter) {
+        updateData.funnelStage = funnelStageAfter
+      }
+      await this.db.orm.public.Ideas
+        .where((f) => f.id.eq(job.ideaId))
+        .update(updateData)
+    }
   }
 
   private async markPaused(job: JobRow, cp: JobCheckpoint): Promise<void> {
-    await this.sql`
-      update queue_jobs set status = 'paused', checkpoint = ${this.sql.json(cp)} where id = ${job.id}`
-    await this.sql`
-      update ideas set execution_status = 'paused', updated_at = now() where id = ${job.idea_id}`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(job.id))
+      .update({
+        status: 'paused',
+        checkpoint: cp,
+      })
+    await this.db.orm.public.Ideas
+      .where((f) => f.id.eq(job.ideaId))
+      .update({
+        executionStatus: 'paused',
+        updatedAt: new Date(),
+      })
   }
 
   private async markCancelled(job: JobRow): Promise<void> {
-    await this.sql`
-      update queue_jobs set status = 'cancelled', finished_at = now() where id = ${job.id}`
-    await this.sql`
-      update ideas set execution_status = 'paused', updated_at = now() where id = ${job.idea_id}`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(job.id))
+      .update({
+        status: 'cancelled',
+        finishedAt: new Date(),
+      })
+    await this.db.orm.public.Ideas
+      .where((f) => f.id.eq(job.ideaId))
+      .update({
+        executionStatus: 'paused',
+        updatedAt: new Date(),
+      })
   }
 
   private async markFailed(
@@ -363,13 +403,20 @@ export class AnalysisWorker {
     error: unknown,
   ): Promise<void> {
     const message = error instanceof Error ? error.message : String(error)
-    await this.sql`
-      update queue_jobs
-      set status = 'failed', finished_at = now(), error = ${message},
-          checkpoint = ${this.sql.json({ ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint)}
-      where id = ${job.id}`
-    await this.sql`
-      update ideas set execution_status = 'error', updated_at = now() where id = ${job.idea_id}`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(job.id))
+      .update({
+        status: 'failed',
+        finishedAt: new Date(),
+        error: message,
+        checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
+      })
+    await this.db.orm.public.Ideas
+      .where((f) => f.id.eq(job.ideaId))
+      .update({
+        executionStatus: 'error',
+        updatedAt: new Date(),
+      })
   }
 
   /** Создаёт запись прогона (TZ §9) */
@@ -379,8 +426,8 @@ export class AnalysisWorker {
       componentVersions[step.role] = isFixture ? 'fixture' : 'z-ai/glm-5.3-flash'
     }
 
-    return createRun(this.sql, {
-      ideaId: job.idea_id,
+    return createRun({
+      ideaId: job.ideaId,
       variant: isFixture ? 'fixture' : 'llm',
       componentVersions,
       configVersion: PIPELINE_VERSION,
@@ -390,7 +437,8 @@ export class AnalysisWorker {
 
   private async clearRewind(jobId: string, cp: JobCheckpoint): Promise<void> {
     const nextCp = { ...cp, rewind_to_step: null } satisfies JobCheckpoint
-    await this.sql`
-      update queue_jobs set checkpoint = ${this.sql.json(nextCp)} where id = ${jobId}`
+    await this.db.orm.public.QueueJobs
+      .where((f) => f.id.eq(jobId))
+      .update({ checkpoint: nextCp })
   }
 }
