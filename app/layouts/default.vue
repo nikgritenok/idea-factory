@@ -2,9 +2,9 @@
 const route = useRoute()
 
 const navItems = [
-  { icon: 'i-lucide-kanban', label: 'Воронка', to: '/ideas' },
-  { icon: 'i-lucide-mic', label: 'Новая идея', to: '/ideas/new' },
-  { icon: 'i-lucide-settings', label: 'Настройки и документация', to: '/settings' },
+  { icon: 'lucide:kanban', label: 'Воронка', to: '/ideas' },
+  { icon: 'lucide:mic', label: 'Новая идея', to: '/ideas/new' },
+  { icon: 'lucide:settings', label: 'Настройки и документация', to: '/settings' },
 ] as const
 
 function isActive(to: string): boolean {
@@ -23,7 +23,9 @@ function isActive(to: string): boolean {
           <span
             class="inline-flex size-9 items-center justify-center rounded-full bg-accent text-lg"
             aria-hidden="true"
-          >☀</span>
+          >
+            <Icon name="lucide:sun" class="size-5 text-foreground" />
+          </span>
           <span class="text-lg font-bold tracking-tight">Фабрика идей</span>
         </NuxtLink>
 
@@ -35,12 +37,13 @@ function isActive(to: string): boolean {
             >
               <NuxtLink
                 :to="item.to"
-                class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+                class="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors"
                 :class="isActive(item.to)
                   ? 'bg-primary-soft text-primary'
                   : 'text-foreground hover:bg-surface'"
                 :aria-current="isActive(item.to) ? 'page' : undefined"
               >
+                <Icon :name="item.icon" class="size-4" />
                 {{ item.label }}
               </NuxtLink>
             </li>

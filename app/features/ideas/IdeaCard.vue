@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { JobSummary } from '../jobs/types'
 
+import { FUNNEL_LABELS, PRIORITY_LABELS } from './types'
 import JobProgress from '../jobs/JobProgress.vue'
 import { extractApiMessage } from './types'
 
@@ -161,9 +162,9 @@ onUnmounted(() => {
         </h1>
         <div class="flex flex-wrap items-center gap-1.5 text-[13px]">
           <span class="rounded-full bg-primary-soft px-2.5 py-0.5 font-medium text-primary">
-            {{ idea.funnelStage }}
+            {{ FUNNEL_LABELS[idea.funnelStage] ?? idea.funnelStage }}
           </span>
-          <span class="rounded-full bg-surface-cream px-2.5 py-0.5 font-medium">Приоритет: {{ idea.priority }}</span>
+          <span class="rounded-full bg-surface-cream px-2.5 py-0.5 font-medium">Приоритет: {{ PRIORITY_LABELS[idea.priority] ?? idea.priority }}</span>
           <span class="rounded-full bg-muted px-2.5 py-0.5 font-medium text-muted-foreground">
             v{{ idea.version }} · создана {{ new Date(idea.createdAt).toLocaleDateString('ru-RU') }}
           </span>
@@ -299,8 +300,13 @@ onUnmounted(() => {
               <button
                 type="submit"
                 :disabled="mvpBusy || !ticketText.trim()"
-                class="inline-flex h-10 items-center justify-center rounded-full bg-secondary px-5 text-sm font-medium text-on-secondary hover:bg-secondary/90 disabled:opacity-50"
+                class="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-secondary px-5 text-sm font-medium text-on-secondary hover:bg-secondary/90 disabled:opacity-50"
               >
+                <Icon
+                  v-if="mvpBusy"
+                  name="lucide:loader-2"
+                  class="size-4 animate-spin"
+                />
                 {{ mvpBusy ? 'Обработка...' : 'Проверить обращение' }}
               </button>
             </form>
@@ -316,11 +322,16 @@ onUnmounted(() => {
               class="space-y-3 rounded-lg border bg-card p-4 text-sm"
             >
               <div class="flex items-center gap-2">
+                <Icon
+                  :name="mvpResult.validated ? 'lucide:check-circle-2' : 'lucide:x-circle'"
+                  :class="mvpResult.validated ? 'text-success' : 'text-destructive'"
+                  class="size-5"
+                />
                 <span
                   :class="mvpResult.validated ? 'bg-success-soft text-success' : 'bg-destructive/10 text-destructive'"
                   class="rounded-full px-2.5 py-0.5 text-xs font-medium"
                 >
-                  {{ mvpResult.validated ? 'Пройдено' : 'Ошибка' }}
+                  {{ mvpResult.validated ? 'Пройдено' : 'Ошибка валидации' }}
                 </span>
                 <span class="font-medium">Классификация</span>
               </div>
@@ -354,14 +365,16 @@ onUnmounted(() => {
           <div class="flex flex-wrap gap-3">
             <NuxtLink
               :to="`/ideas/${idea.id}/report`"
-              class="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              Открыть отчёт →
+              Открыть отчёт
+              <Icon name="lucide:arrow-right" class="size-4" />
             </NuxtLink>
             <NuxtLink
               :to="`/ideas/${idea.id}/runs`"
-              class="inline-flex h-12 items-center justify-center rounded-full border px-6 text-sm font-medium hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="inline-flex h-12 items-center gap-2 rounded-full border px-6 text-sm font-medium transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
+              <Icon name="lucide:bar-chart-3" class="size-4" />
               Прогоны и эффективность
             </NuxtLink>
           </div>

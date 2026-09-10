@@ -2,7 +2,7 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', '@nuxt/a11y', '@sentry/nuxt/module', 'evlog/nuxt'],
+  modules: ['@nuxt/eslint', '@nuxt/a11y', '@sentry/nuxt/module', 'evlog/nuxt', '@nuxt/icon'],
   devtools: { enabled: true },
   app: {
     head: {
@@ -22,6 +22,7 @@ export default defineNuxtConfig({
         },
       ],
     },
+    pageTransition: { name: 'page', mode: 'out-in' },
   },
   css: ['~/assets/css/tailwind.css'],
   runtimeConfig: {

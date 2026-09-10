@@ -34,6 +34,7 @@
     "@langchain/langgraph": "^1.4.14",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.5",
     "@lucide/vue": "^1.42.0",
+    "@nuxt/icon": "^2.5.1",
     "@prisma/composer": "^0.17.0",
     "@prisma/orm-postgres": "8.0.0-rc.8",
     "@sentry/nuxt": "^10.73.0",

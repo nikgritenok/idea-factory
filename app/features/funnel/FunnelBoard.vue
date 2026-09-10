@@ -251,9 +251,14 @@ const emptyText = computed(() =>
               v-if="idea.funnelStage !== 'mvp_ready'"
               type="button"
               :disabled="busyIdeaId === idea.id"
-              class="inline-flex h-10 items-center rounded-full bg-secondary px-4 text-sm font-medium text-[#111111] transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="inline-flex h-10 items-center gap-1.5 rounded-full bg-secondary px-4 text-sm font-medium text-[#111111] transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               @click="runAnalysis(idea)"
             >
+              <Icon
+                v-if="busyIdeaId === idea.id"
+                name="lucide:loader-2"
+                class="size-4 animate-spin"
+              />
               {{ busyIdeaId === idea.id ? 'Запуск…' : 'Запустить анализ' }}
             </button>
             <button
