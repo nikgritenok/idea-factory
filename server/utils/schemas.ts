@@ -26,7 +26,7 @@ export {
   parseUuid,
   parseBody,
   safeParse,
-} from '../../shared/schemas'
+} from '~~/shared/schemas'
 
 export type {
   Priority,
@@ -37,5 +37,5 @@ export type {
   JobCheckpoint,
   JobRow,
   PipelineStep,
-} from '../../shared/schemas'
+} from '~~/shared/schemas'
 /* eslint-enable unicorn/no-barrel-files */
