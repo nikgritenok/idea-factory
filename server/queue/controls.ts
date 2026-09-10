@@ -42,7 +42,7 @@ export async function pauseJob(db: PrismaDb, jobId: string): Promise<JobRow> {
     .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     })
   return updated as unknown as JobRow
 }
@@ -63,7 +63,7 @@ export async function resumeJob(db: PrismaDb, jobId: string): Promise<JobRow> {
     .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     })
   return updated as unknown as JobRow
 }
@@ -77,14 +77,14 @@ export async function cancelJob(db: PrismaDb, jobId: string): Promise<JobRow> {
   const updated = await db.orm.public.QueueJobs
     .where(f => f.id.eq(jobId))
     .update({
-      finishedAt: new Date(),
+      finishedAt: new Date().toISOString(),
       status: 'cancelled',
     })
   await db.orm.public.Ideas
     .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     })
   return updated as unknown as JobRow
 }
@@ -127,7 +127,7 @@ export async function retryStep(
     .where(f => f.id.eq(job.ideaId))
     .update({
       executionStatus: 'paused',
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     })
   return updated as unknown as JobRow
 }
@@ -145,7 +145,7 @@ export async function setJobPriority(db: PrismaDb, jobId: string, priority: Queu
     .where(f => f.id.eq(job.ideaId))
     .update({
       priority,
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     })
   return updated as unknown as JobRow
 }

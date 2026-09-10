@@ -20,7 +20,8 @@ const db = postgres<Contract>({ contractJson, url: DB })
 
 async function applyMigrations(dbUrl: string): Promise<void> {
   const raw = readFileSync(resolve(import.meta.dirname, '../../db/migrations/20260907000000_initial.sql'), 'utf8')
-  const up = raw.split('-- migrate:down')[0].replace('-- migrate:up', '')
+  const parts = raw.split('-- migrate:down')
+  const up = (parts[0] ?? '').replace('-- migrate:up', '')
   const idempotent = up
     .replaceAll('create table ', 'create table if not exists ')
     .replaceAll('create index ', 'create index if not exists ')
@@ -93,7 +94,7 @@ describe('enqueueIdeaAnalysis (TZ §8: постановка в очередь)',
     const first = await enqueueIdeaAnalysis(db, ideaId)
     await db.orm.public.QueueJobs
       .where(f => f.id.eq(first.job.id))
-      .update({ finishedAt: new Date(), status: 'done' })
+      .update({ finishedAt: new Date().toISOString(), status: 'done' })
 
     const second = await enqueueIdeaAnalysis(db, ideaId)
     expect(second.created).toBe(true)
@@ -162,7 +163,7 @@ describe('anti-starvation (TZ §8)', () => {
     // Задача ждёт 20 минут — set enqueued_at to 20 minutes ago
     await db.orm.public.QueueJobs
       .where(f => f.id.eq(job.id))
-      .update({ enqueuedAt: new Date(Date.now() - 20 * 60 * 1000) })
+      .update({ enqueuedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString() })
 
     const freshMedium = await insertIdea('starve-medium', 'medium')
     await enqueueIdeaAnalysis(db, freshMedium)
@@ -176,7 +177,7 @@ describe('anti-starvation (TZ §8)', () => {
     const { job } = await enqueueIdeaAnalysis(db, ideaId)
     await db.orm.public.QueueJobs
       .where(f => f.id.eq(job.id))
-      .update({ enqueuedAt: new Date(Date.now() - 5 * 60 * 1000) })
+      .update({ enqueuedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString() })
 
     const freshMedium = await insertIdea('starve-early-medium', 'medium')
     await enqueueIdeaAnalysis(db, freshMedium)
@@ -190,7 +191,7 @@ describe('anti-starvation (TZ §8)', () => {
     const { job } = await enqueueIdeaAnalysis(db, ideaId)
     await db.orm.public.QueueJobs
       .where(f => f.id.eq(job.id))
-      .update({ enqueuedAt: new Date(Date.now() - 3 * 60 * 60 * 1000) })
+      .update({ enqueuedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() })
 
     const freshHigh = await insertIdea('starve-cap-high', 'high')
     await enqueueIdeaAnalysis(db, freshHigh)
@@ -206,7 +207,7 @@ describe('resume-first и блокировки claim', () => {
     const leftover = await db.orm.public.QueueJobs.create({
       ideaId: runningIdea,
       priority: 'low',
-      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      startedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       status: 'running',
     })
 

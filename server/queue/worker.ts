@@ -234,14 +234,14 @@ export class AnalysisWorker {
       .where(f => f.id.eq(job.id))
       .update({
         checkpoint: { ...cp, graph_started: true, last_step: completedStep } satisfies JobCheckpoint,
-        finishedAt: new Date(),
+        finishedAt: new Date().toISOString(),
         status: 'done',
       })
     await this.db.orm.public.Ideas
       .where(f => f.id.eq(job.ideaId))
       .update({
         funnelStage: 'decision',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
     return 'done'
   }
@@ -267,7 +267,7 @@ export class AnalysisWorker {
         await this.db.orm.public.AgentOutputs.create({
           ideaId,
           formatValid: true,
-          output: result as Record<string, unknown>,
+          output: JSON.parse(JSON.stringify(result)),
           role: step.role ?? step.id,
           runId: runId ?? null,
         })
@@ -294,8 +294,8 @@ export class AnalysisWorker {
           ideaId,
           recommendation: rec.recommendation ?? null,
           score: String(rec.overallScore ?? rec.score ?? null),
-          sections: nested as Record<string, unknown>,
-          stopFactors: (rec.stopFactors ?? []) as unknown[],
+          sections: JSON.parse(JSON.stringify(nested)),
+          stopFactors: JSON.parse(JSON.stringify(rec.stopFactors ?? [])),
           version: nextVersion,
         })
       }
@@ -337,14 +337,14 @@ export class AnalysisWorker {
       .where(f => f.id.eq(job.id))
       .update({
         checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
-        finishedAt: new Date(),
+        finishedAt: new Date().toISOString(),
         status: 'done',
       })
     await this.db.orm.public.Ideas
       .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
     return 'done'
   }
@@ -357,11 +357,11 @@ export class AnalysisWorker {
       builder.addNode(step.id, this.makeNode(step, exec))
       stepIds.push(step.id)
     }
-    builder.addEdge(START, stepIds[0] as string)
+    builder.addEdge(START, stepIds[0] as '__start__')
     for (let i = 0; i < stepIds.length - 1; i++) {
-      builder.addEdge(stepIds[i] as string, stepIds[i + 1] as string)
+      builder.addEdge(stepIds[i] as '__start__', stepIds[i + 1] as '__start__')
     }
-    builder.addEdge(stepIds.at(-1) as string, END)
+    builder.addEdge(stepIds.at(-1) as '__start__', END)
     return builder.compile({ checkpointer: this.opts.checkpointer.checkpointer })
   }
 
@@ -415,9 +415,9 @@ export class AnalysisWorker {
       .where(f => f.id.eq(jobId))
       .first()
     if (job) {
-      const updateData: { funnelStage?: string, executionStatus: string, updatedAt: Date } = {
+      const updateData: { funnelStage?: string, executionStatus: string, updatedAt: string } = {
         executionStatus: 'running',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       }
       if (funnelStageAfter) {
         updateData.funnelStage = funnelStageAfter
@@ -439,7 +439,7 @@ export class AnalysisWorker {
       .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
   }
 
@@ -447,14 +447,14 @@ export class AnalysisWorker {
     await this.db.orm.public.QueueJobs
       .where(f => f.id.eq(job.id))
       .update({
-        finishedAt: new Date(),
+        finishedAt: new Date().toISOString(),
         status: 'cancelled',
       })
     await this.db.orm.public.Ideas
       .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'paused',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
   }
 
@@ -470,14 +470,14 @@ export class AnalysisWorker {
       .update({
         checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
         error: message,
-        finishedAt: new Date(),
+        finishedAt: new Date().toISOString(),
         status: 'failed',
       })
     await this.db.orm.public.Ideas
       .where(f => f.id.eq(job.ideaId))
       .update({
         executionStatus: 'error',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
   }
 

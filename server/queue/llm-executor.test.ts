@@ -30,6 +30,7 @@ describe('LLM-исполнитель', () => {
 
     const executor = createLlmExecutor('orchestrator')
     const ctx = {
+      db: {} as never,
       ideaId: 'test-idea-id',
       jobId: 'test-job-id',
       signal: new AbortController().signal,
@@ -48,6 +49,7 @@ describe('LLM-исполнитель', () => {
   it('выбрасывает ошибку для неизвестной роли', async () => {
     const executor = createLlmExecutor('unknown_role')
     const ctx = {
+      db: {} as never,
       ideaId: 'test-idea-id',
       jobId: 'test-job-id',
       signal: new AbortController().signal,
@@ -68,6 +70,7 @@ describe('LLM-исполнитель', () => {
 
     const executor = createLlmExecutor('critic')
     const ctx = {
+      db: {} as never,
       ideaId: 'test-idea-id',
       jobId: 'test-job-id',
       signal: new AbortController().signal,

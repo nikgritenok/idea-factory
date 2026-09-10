@@ -61,8 +61,8 @@ export async function recordRunCall(
       durationMs: call.durationMs,
       error: call.error ?? null,
       ok: call.ok,
-      request: call.request,
-      response: call.response,
+      request: call.request as Record<string, unknown>,
+      response: call.response as Record<string, unknown>,
       runId,
     })
   return row.id
@@ -80,7 +80,7 @@ export async function finishRun(
     .where(f => f.id.eq(runId))
     .update({
       error: error ?? null,
-      finishedAt: new Date(),
+      finishedAt: new Date().toISOString(),
       status,
     })
 }

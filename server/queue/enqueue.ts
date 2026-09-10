@@ -61,7 +61,7 @@ async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: st
       .where(f => f.id.eq(ideaId))
       .update({
         funnelStage: 'queued',
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
     return job as unknown as JobRow
   }
@@ -102,7 +102,7 @@ async function insertJob(db: PrismaDb, ideaId: string, priority: string, key: st
     .where(f => f.id.eq(ideaId))
     .update({
       funnelStage: 'queued',
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     })
   return job2 as unknown as JobRow
 }

@@ -128,7 +128,7 @@ async function getRunMetrics(
  */
 export async function getRunsForIdea(
   ideaId: string,
-): Promise<Array<{ id: string, variant: string, status: string, startedAt: Date }>> {
+): Promise<Array<{ id: string, variant: string, status: string, startedAt: string }>> {
   const runs = await db.orm.public.Runs
     .select('id', 'variant', 'status', 'startedAt')
     .where(f => f.ideaId.eq(ideaId))

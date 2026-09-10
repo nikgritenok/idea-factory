@@ -81,8 +81,8 @@ export async function validateRules(
       durationMs: callRecord.durationMs,
       error: callRecord.error ?? null,
       ok: callRecord.ok,
-      request: callRecord.request,
-      response: callRecord.response,
+      request: JSON.parse(JSON.stringify(callRecord.request)),
+      response: JSON.parse(JSON.stringify(callRecord.response)),
       runId,
     })
   }

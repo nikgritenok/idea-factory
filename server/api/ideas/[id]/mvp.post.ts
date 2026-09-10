@@ -95,7 +95,7 @@ export default defineEventHandler(async (event) => {
     await db.orm.public.IdeaVersions.create({
       changedFields: { mvp_ticket_added: true },
       ideaId,
-      snapshot: { mvpTicket: ticketCard },
+      snapshot: { mvpTicket: JSON.parse(JSON.stringify(ticketCard)) },
       version: (latestVersion?.version ?? 0) + 1,
     })
 

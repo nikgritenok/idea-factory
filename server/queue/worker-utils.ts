@@ -41,14 +41,15 @@ export async function sleep(ms: number): Promise<void> {
 
 /** История чекпоинтов: находит snapshot, из которого шаг выполнится повторно */
 export async function findCheckpointBefore(
-  graph: { getStateHistory(config: unknown): AsyncIterable<{ next: readonly string[], config: Record<string, unknown> }> },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  graph: { getStateHistory(config: unknown): AsyncIterable<{ next: readonly string[], config: any }> },
   threadId: string,
   stepId: string,
 ): Promise<Record<string, unknown> | undefined> {
   const config = { configurable: { thread_id: threadId } }
   for await (const snapshot of graph.getStateHistory(config)) {
     if (snapshot.next.includes(stepId)) {
-      return snapshot.config
+      return snapshot.config as Record<string, unknown>
     }
   }
   return undefined

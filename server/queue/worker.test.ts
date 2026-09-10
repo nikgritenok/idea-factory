@@ -24,7 +24,8 @@ const db = postgres<Contract>({ contractJson, url: DB })
 
 async function applyMigrations(dbUrl: string): Promise<void> {
   const raw = readFileSync(resolve(import.meta.dirname, '../../db/migrations/20260907000000_initial.sql'), 'utf8')
-  const up = raw.split('-- migrate:down')[0].replace('-- migrate:up', '')
+  const parts = raw.split('-- migrate:down')
+  const up = (parts[0] ?? '').replace('-- migrate:up', '')
   const idempotent = up
     .replaceAll('create table ', 'create table if not exists ')
     .replaceAll('create index ', 'create index if not exists ')

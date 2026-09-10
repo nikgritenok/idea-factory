@@ -26,10 +26,10 @@ export const calcExecutor = async (ctx: StepContext): Promise<StepResult> => {
     ideaId: ctx.ideaId,
     inputSummary: output.inputSummary,
     modelVersion: output.result.modelVersion,
-    params: output.result.mainVariant,
-    result: { decision: output.decision, result: output.result },
+    params: JSON.parse(JSON.stringify(output.result.mainVariant)),
+    result: JSON.parse(JSON.stringify({ decision: output.decision, result: output.result })),
     seed: BigInt(output.seed),
-    warnings: output.result.warnings,
+    warnings: JSON.parse(JSON.stringify(output.result.warnings)),
   })
 
   return {

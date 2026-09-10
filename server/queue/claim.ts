@@ -85,7 +85,7 @@ export async function claimNextJob(db: PrismaDb, opts: ClaimOptions = {}): Promi
       .update({
         attempts: best.attempts + 1,
         effectivePriority: bestScore,
-        startedAt: new Date(),
+        startedAt: new Date().toISOString(),
         status: 'running',
       })
     return claimed as unknown as JobRow | undefined

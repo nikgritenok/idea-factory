@@ -10,8 +10,7 @@ export default defineNitroPlugin(async () => {
     return
   }
 
-  const { db, ensureMigrated } = await import('../utils/db')
-  await ensureMigrated()
+  const { db } = await import('../utils/db')
 
   const handle = createCheckpointer()
   const worker = new AnalysisWorker(db, { checkpointer: handle, steps: PIPELINE_STEPS })

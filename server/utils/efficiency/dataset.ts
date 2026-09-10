@@ -51,8 +51,8 @@ export const DATASET_DEFAULTS = {
   rowCount: 200,
 } as const
 
-/** Тип для переопределений (без as const литеральности) */
-export type DatasetParams = { -readonly [K in keyof typeof DATASET_DEFAULTS]: (typeof DATASET_DEFAULTS)[K] }
+/** Тип для переопределений (с number вместо литеральных типов) */
+export type DatasetParams = { [K in keyof typeof DATASET_DEFAULTS]: number }
 
 const CATEGORIES = ['вопрос', 'жалоба', 'запрос', 'предложение'] as const
 
