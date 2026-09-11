@@ -8,7 +8,6 @@ import { AnalysisWorker } from './worker'
  * Использование: pnpm run worker (DATABASE_URL из окружения, см. .env.example).
  */
 async function main(): Promise<void> {
-
   const handle = createCheckpointer()
   await ensureCheckpointerTables(handle)
 

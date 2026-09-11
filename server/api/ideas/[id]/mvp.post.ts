@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, TicketSchema.parse)
 
   const idea = await db.orm.public.Ideas
-    .where((f) => f.id.eq(ideaId))
+    .where(f => f.id.eq(ideaId))
     .first()
   if (!idea) {
     throw createError({ statusCode: 404, statusMessage: 'Идея не найдена' })
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
     // Шаг 1: LLM-классификация (реальный вызов routerai.ru)
     const classification = await withRunCall(
       runId, 'llm-classifier', 'glm-5.3-flash', { textLength: body.text.length },
-      () => callLlm(ClassificationSchema, {
+      async () => await callLlm(ClassificationSchema, {
         system: CLASSIFY_PROMPT,
         temperature: 0.1,
         user: body.text,
@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
         department: classification.data.department,
         priority: classification.data.priority,
       },
-      () => validateRules({
+      async () => await validateRules({
         category: classification.data.category,
         priority: classification.data.priority,
         responsibleDepartment: classification.data.department,
@@ -88,8 +88,8 @@ export default defineEventHandler(async (event) => {
     await finishRun(runId, 'completed')
 
     const latestVersion = await db.orm.public.IdeaVersions
-      .where((f) => f.ideaId.eq(ideaId))
-      .orderBy((f) => f.version.desc())
+      .where(f => f.ideaId.eq(ideaId))
+      .orderBy(f => f.version.desc())
       .first()
 
     await db.orm.public.IdeaVersions.create({
@@ -109,7 +109,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await finishRun(runId, 'failed', message).catch(() => undefined)
+    await finishRun(runId, 'failed', message).catch(() => {})
     throw createError({ statusCode: 502, statusMessage: `MVP-сценарий упал: ${message}` })
   }
 })

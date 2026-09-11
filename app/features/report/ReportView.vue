@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { nextSteps, RECOMMENDATION_LABELS, ROLE_LABELS, weaknesses } from './report-sections'
+
 interface ReportSection {
   content: unknown
   key: string
@@ -36,24 +38,6 @@ const outputs = ref<AgentOutput[]>([])
 const loading = ref(true)
 const loadError = ref<null | string>(null)
 const showRaw = ref(false)
-
-const RECOMMENDATION_LABELS: Record<string, string> = {
-  develop: 'Развивать',
-  insufficient_data: 'Недостаточно данных',
-  postpone: 'Отложить',
-  reject: 'Отклонить',
-  validate_first: 'Сначала провалидировать',
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  critic: 'Критик',
-  efficiency_analyst: 'Аналитик эффективности',
-  idea_analyst: 'Аналитик идеи',
-  market_analyst: 'Аналитик рынка',
-  orchestrator: 'Оркестратор',
-  report_editor: 'Редактор отчёта',
-  strategist: 'Стратег',
-}
 
 async function load(): Promise<void> {
   loading.value = true
@@ -98,6 +82,15 @@ const stopFactorList = computed<StopFactor[]>(() => {
     typeof item === 'object' && item !== null,
   )
 })
+
+const weaknessList = computed(() => weaknesses(report.value?.sections ?? []))
+const nextStepList = computed(() => nextSteps(report.value?.sections ?? []))
+
+const generalSections = computed(() =>
+  (report.value?.sections ?? []).filter(
+    section => !['weaknesses', 'nextSteps'].includes(section.key),
+  ),
+)
 </script>
 
 <template>
@@ -200,8 +193,18 @@ const stopFactorList = computed<StopFactor[]>(() => {
           :factors="stopFactorList"
         />
 
+        <WeaknessesSection
+          v-if="weaknessList.length"
+          :weaknesses="weaknessList"
+        />
+
+        <NextStepsSection
+          v-if="nextStepList.length"
+          :steps="nextStepList"
+        />
+
         <section
-          v-for="section in report.sections"
+          v-for="section in generalSections"
           :key="section.key"
           class="space-y-3 rounded-2xl border bg-card p-6"
           :aria-labelledby="`section-${section.key}`"

@@ -54,7 +54,7 @@ export const OrchestratorPlanSchema = z.object({
   estimatedMinutes: MinutesSchema,
   /** Примечания для следующих шагов */
   notes: z.preprocess(
-    (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v)),
+    v => (v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v))),
     z.string().max(2000).optional(),
   ),
   /** Приоритет идеи (high/medium/low) */
@@ -80,7 +80,7 @@ export const OrchestratorPlanSchema = z.object({
   ),
   /** Краткое описание идеи (для заголовка карточки) */
   title: z.preprocess(
-    (v) => (typeof v === 'string' && v.length > 0 ? v : String(v ?? 'Анализ идеи')),
+    v => (typeof v === 'string' && v.length > 0 ? v : String(v ?? 'Анализ идеи')),
     z.string().min(1).max(2000),
   ),
 })

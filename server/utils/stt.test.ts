@@ -1,11 +1,11 @@
+import { execFile } from 'node:child_process'
 import { describe, expect, it, vi } from 'vitest'
+
+import { SttError, transcribeAudio } from './stt'
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
 }))
-
-import { execFile } from 'node:child_process'
-import { SttError, transcribeAudio } from './stt'
 
 const mockExecFile = vi.mocked(execFile)
 
@@ -35,10 +35,10 @@ describe('transcribeAudio — контракт routerai STT', () => {
 
   describe('webm → wav конвертация', () => {
     it('вызывает ffmpeg с нужными аргументами', async () => {
-      process.env.ROUTERAI_API_KEY = 'test-key'
+      process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
       mockExecFile.mockImplementation(
         (...args: unknown[]) => {
-          const cb = args[args.length - 1] as (err: Error | null) => void
+          const cb = args.at(-1) as (err: Error | null) => void
           cb(null)
           return {} as any
         },
@@ -64,10 +64,10 @@ describe('transcribeAudio — контракт routerai STT', () => {
     })
 
     it('tmpdir удаляется при ошибке ffmpeg', async () => {
-      process.env.ROUTERAI_API_KEY = 'test-key'
+      process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
       mockExecFile.mockImplementation(
         (...args: unknown[]) => {
-          const cb = args[args.length - 1] as (err: Error | null) => void
+          const cb = args.at(-1) as (err: Error | null) => void
           cb(new Error('ffmpeg not found'))
           return {} as any
         },
@@ -78,7 +78,7 @@ describe('transcribeAudio — контракт routerai STT', () => {
     })
 
     it('wav-файлы не конвертируются', async () => {
-      process.env.ROUTERAI_API_KEY = 'test-key'
+      process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
       mockExecFile.mockClear()
 
       const wavBlob = new Blob([new Uint8Array([0x52, 0x49, 0x46, 0x46])], { type: 'audio/wav' })

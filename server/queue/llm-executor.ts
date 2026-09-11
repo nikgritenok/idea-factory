@@ -75,7 +75,7 @@ async function getIdeaTranscript(ctx: StepContext): Promise<string> {
   // Загружаем из БД — надёжный источник для любого шага
   const idea = await ctx.db.orm.public.Ideas
     .select('sourceTranscript')
-    .where((f) => f.id.eq(ctx.ideaId))
+    .where(f => f.id.eq(ctx.ideaId))
     .first()
 
   return idea?.sourceTranscript ?? ''

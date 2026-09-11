@@ -1,13 +1,13 @@
 import type { z } from 'zod'
 
-import { traceable } from 'langsmith/traceable'
-
 const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
 export const LLM_MODEL = 'z-ai/glm-5.3-flash'
 
 export interface LlmCallOptions {
   /** Максимум токенов в ответе (по умолчанию 4096) */
   maxTokens?: number
+  /** Шаг пайплайна (для трейсинга) */
+  step?: string
   /** System prompt — роль и границы */
   system: string
   /** Температура (0.0–2.0, по умолчанию 0.3) */
@@ -42,8 +42,7 @@ export class LlmError extends Error {
  * Вызов LLM через routerai.ru (OpenAI-compatible /v1/chat/completions).
  * Возвращает сырой текст ответа модели.
  */
-const callLlmRaw = traceable(
-  async (options: LlmCallOptions): Promise<{ text: string, usage?: LlmCallResult<unknown>['usage'], cost?: number }> => {
+async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usage?: LlmCallResult<unknown>['usage'], cost?: number }> {
   const apiKey = process.env.ROUTERAI_API_KEY
   if (!apiKey) {
     throw new LlmError('LLM-ключ не настроен на сервере', 503)
@@ -65,6 +64,7 @@ const callLlmRaw = traceable(
   const controller = new AbortController()
   const timeout = setTimeout(() => { controller.abort() }, options.timeoutMs ?? 300_000)
 
+  const startTime = Date.now()
   let res: Response
   try {
     res = await fetch(`${ROUTERAI_BASE}/chat/completions`, {
@@ -103,18 +103,31 @@ const callLlmRaw = traceable(
     throw new LlmError('LLM вернул пустой ответ')
   }
 
+  const durationMs = Date.now() - startTime
+  const usage = {
+    completionTokens: data.usage?.completion_tokens,
+    promptTokens: data.usage?.prompt_tokens,
+    totalTokens: data.usage?.total_tokens,
+  }
+
+  // Логируем метрики вызова (для LangSmith трейсинга через LangGraph)
+  if (process.env.LANGSMITH_TRACING === 'true') {
+    console.log(JSON.stringify({
+      durationMs,
+      event: 'llm_call',
+      model: LLM_MODEL,
+      step: options.step,
+      temperature: options.temperature ?? 0.3,
+      tokens: usage.totalTokens,
+    }))
+  }
+
   return {
     cost: 0, // routerai.ru не всегда возвращает стоимость
     text: content.trim(),
-    usage: {
-      completionTokens: data.usage?.completion_tokens,
-      promptTokens: data.usage?.prompt_tokens,
-      totalTokens: data.usage?.total_tokens,
-    },
+    usage,
   }
-},
-  { name: 'llm-call' },
-)
+}
 
 /**
  * Вызов LLM с валидацией ответа через Zod-схему.

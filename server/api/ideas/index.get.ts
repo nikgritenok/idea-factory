@@ -14,12 +14,7 @@ export default defineEventHandler(async (event) => {
       'createdAt', 'updatedAt', 'version',
     )
 
-  if (stage) {
-    q = q.where(f => f.funnelStage.eq(stage))
-  }
-  else {
-    q = q.where(f => f.funnelStage.neq('archived'))
-  }
+  q = stage ? q.where(f => f.funnelStage.eq(stage)) : q.where(f => f.funnelStage.neq('archived'))
 
   const rows = await q
     .orderBy(f => f.priority.asc())
