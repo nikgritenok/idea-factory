@@ -3,10 +3,9 @@ import type { JobCheckpoint, JobRow, PrismaDb } from './types'
 import { QUEUE_CONFIG } from '../../config/pipeline'
 import { effectivePriority } from './priority'
 
-function toEpochMs(value: Date | string | Temporal.Instant): number {
+function toEpochMs(value: Date | string): number {
   if (value instanceof Date) return value.getTime()
-  if (typeof value === 'string') return Temporal.Instant.from(value).epochMilliseconds
-  return Number(value.epochMilliseconds)
+  return new Date(value).getTime()
 }
 
 export interface ClaimOptions {
