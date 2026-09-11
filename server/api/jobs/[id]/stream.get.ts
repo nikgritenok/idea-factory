@@ -1,4 +1,4 @@
-import { createEventStream } from 'h3'
+import { setResponseHeader, setResponseStatus } from 'h3'
 
 import { db } from '../../../utils/db'
 import { parseUuid } from '../../../utils/schemas'
@@ -7,10 +7,23 @@ import { parseUuid } from '../../../utils/schemas'
 // Просвечивает БД каждые 2 сек, пушит при изменении currentStep или status.
 export default defineEventHandler((event) => {
   const jobId = parseUuid(getRouterParam(event, 'id'))
-  const eventStream = createEventStream(event)
+
+  setResponseStatus(event, 200)
+  setResponseHeader(event, 'Content-Type', 'text/event-stream')
+  setResponseHeader(event, 'Cache-Control', 'no-cache')
+  setResponseHeader(event, 'Connection', 'keep-alive')
+  setResponseHeader(event, 'X-Accel-Buffering', 'no')
+
+  const nodeRes = event.node.res
 
   let lastStep: string | null = null
   let lastStatus: string | null = null
+  let closed = false
+
+  function send(data: Record<string, unknown>): void {
+    if (closed) return
+    nodeRes.write(`data: ${JSON.stringify(data)}\n\n`)
+  }
 
   const interval = setInterval(() => {
     void (async () => {
@@ -21,7 +34,7 @@ export default defineEventHandler((event) => {
           .first()
 
         if (!job) {
-          await eventStream.push(JSON.stringify({ message: 'Задача не найдена', type: 'error' }))
+          send({ message: 'Задача не найдена', type: 'error' })
           return
         }
 
@@ -29,34 +42,34 @@ export default defineEventHandler((event) => {
         const status = (job as { status: string }).status
         const error = (job as { error?: string | null }).error ?? null
 
-        // Пушим только при изменении
         if (currentStep !== lastStep || status !== lastStatus) {
           lastStep = currentStep
           lastStatus = status
-          await eventStream.push(JSON.stringify({
-            currentStep,
-            error,
-            status,
-            type: 'progress',
-          }))
+          send({ currentStep, error, status, type: 'progress' })
         }
 
-        // Завершаем поток если задача в терминальном статусе
         if (['cancelled', 'done', 'failed'].includes(status)) {
-          clearInterval(interval)
-          await eventStream.push(JSON.stringify({ status, type: 'done' }))
-          await eventStream.close()
+          send({ status, type: 'done' })
+          cleanup()
         }
       }
       catch {
-        // DB error — не закрываем поток, повторим через 2 сек
+        // DB error — повторим через 2 сек
       }
     })()
   }, 2000)
 
-  eventStream.onClosed(() => {
+  function cleanup(): void {
+    if (closed) return
+    closed = true
     clearInterval(interval)
-  })
+    if (!nodeRes.writableEnded) {
+      nodeRes.end()
+    }
+  }
 
-  return eventStream
+  nodeRes.on('close', cleanup)
+
+  // Первый пинг чтобы клиент знал что соединение установлено
+  send({ type: 'connected' })
 })
