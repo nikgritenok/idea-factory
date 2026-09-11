@@ -38,3 +38,6 @@ playwright-report/
 .claude/
 node_modules/
 dist/
+
+# Prisma snapshots (auto-generated)
+migrations/snapshots/
