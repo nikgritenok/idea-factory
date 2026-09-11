@@ -25,6 +25,8 @@ interface AgentOutput {
   validationError: null | string
 }
 
+interface StopFactor { description?: null | string, reason?: null | string, workaround?: null | string }
+
 const route = useRoute()
 const ideaId = route.params.id as string
 
@@ -87,6 +89,15 @@ function renderValue(value: unknown): string {
   if (typeof value === 'string') return value
   return JSON.stringify(value, null, 2)
 }
+
+const stopFactorList = computed<StopFactor[]>(() => {
+  const raw = report.value?.stopFactors
+  if (!raw) return []
+  const list: unknown[] = Array.isArray(raw) ? raw : Object.values(raw)
+  return list.filter((item): item is StopFactor =>
+    typeof item === 'object' && item !== null,
+  )
+})
 </script>
 
 <template>
@@ -184,19 +195,10 @@ function renderValue(value: unknown): string {
           </div>
         </section>
 
-        <section
-          v-if="report.stopFactors && (Array.isArray(report.stopFactors) ? report.stopFactors.length : Object.keys(report.stopFactors).length)"
-          class="rounded-2xl border border-destructive/30 bg-destructive/5 p-6"
-          aria-labelledby="stop-heading"
-        >
-          <h2
-            id="stop-heading"
-            class="text-lg font-bold text-destructive"
-          >
-            Стоп-факторы
-          </h2>
-          <pre class="mt-2 overflow-x-auto text-sm leading-6">{{ renderValue(report.stopFactors) }}</pre>
-        </section>
+        <StopFactorsSection
+          v-if="stopFactorList.length"
+          :factors="stopFactorList"
+        />
 
         <section
           v-for="section in report.sections"
