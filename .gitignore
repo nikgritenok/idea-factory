@@ -22,7 +22,6 @@ logs
 .env
 .env.*
 !.env.example
-opencode.json
 
 # Playwright
 test-results/

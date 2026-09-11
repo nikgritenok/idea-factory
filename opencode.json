@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["TZ.md", "DESIGN.md"],
+  "plugin": ["opencode-tavily"],
+  "provider": {
+    "routerai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "RouterAI",
+      "options": {
+        "baseURL": "https://routerai.ru/api/v1",
+        "apiKey": "${ROUTERAI_API_KEY}"
+      },
+      "models": {
+        "z-ai/glm-5.3-flash": {
+          "name": "GLM 5.3 Flash (Z.AI)",
+          "limit": {
+            "context": 1048576,
+            "output": 131072
+          },
+          "options": {
+            "reasoningEffort": "low"
+          }
+        }
+      }
+    }
+  },
+  "mcp": {
+    "prisma": {
+      "type": "local",
+      "command": ["npx", "-y", "prisma", "mcp"],
+      "enabled": true
+    }
+  }
+}
