@@ -19,21 +19,21 @@ export default defineEventHandler(async (event) => {
 
   return {
     idea: {
-      execution_status: idea?.executionStatus ?? null,
-      funnel_stage: idea?.funnelStage ?? null,
+      executionStatus: idea?.executionStatus ?? null,
+      funnelStage: idea?.funnelStage ?? null,
       id: job.ideaId,
       title: idea?.title ?? null,
     },
     job: {
       attempts: job.attempts,
-      current_step: job.currentStep,
-      enqueued_at: job.enqueuedAt,
+      currentStep: job.currentStep,
+      enqueuedAt: job.enqueuedAt,
       error: job.error,
-      finished_at: job.finishedAt,
+      finishedAt: job.finishedAt,
       id: job.id,
-      idea_id: job.ideaId,
+      ideaId: job.ideaId,
       priority: job.priority,
-      started_at: job.startedAt,
+      startedAt: job.startedAt,
       status: job.status,
     },
   }

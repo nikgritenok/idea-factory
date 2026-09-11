@@ -1,5 +1,4 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
-import { traceable } from 'langsmith/traceable'
 
 import type { PipelineStep } from '../../config/pipeline'
 import type { CheckpointerHandle } from './checkpointer'
@@ -266,8 +265,8 @@ export class AnalysisWorker {
         const result = stepResults[step.id]
         if (result === undefined) continue
         await this.db.orm.public.AgentOutputs.create({
-          ideaId,
           formatValid: true,
+          ideaId,
           output: JSON.parse(JSON.stringify(result)),
           role: step.role ?? step.id,
           runId: runId ?? null,
@@ -283,19 +282,45 @@ export class AnalysisWorker {
           .update({ outdated: true })
 
         // Данные критика могут быть вложены в { data: {...}, metadata: {...} }
-        const nested = (criticResult as { data?: Record<string, unknown> })?.data ?? criticResult as Record<string, unknown>
-        const rec = nested as { recommendation?: string, overallScore?: number, score?: number, stopFactors?: unknown[] }
+        const nested = (criticResult as { data?: Record<string, unknown> })?.data ?? criticResult
+        const rec = nested as {
+          confidence?: string
+          nextSteps?: string[]
+          overallScore?: number
+          reasoning?: string
+          recommendation?: string
+          score?: number
+          stopFactors?: Array<{ description?: string, reason?: string, severity?: string, severityLow?: string, severityMedium?: string, severityHigh?: string, workaround?: string }>
+          weaknesses?: Array<{ description?: string, mitigation?: string, severity?: string }>
+        }
         const existing = await this.db.orm.public.Reports
           .where(f => f.ideaId.eq(ideaId))
           .orderBy(f => f.version.desc())
           .first()
         const nextVersion = existing ? ((existing as { version: number }).version + 1) : 1
 
+        // Конвертируем 0–100 → 0–10 для UI
+        const rawScore = rec.overallScore ?? rec.score ?? 0
+        const scoreOutOf10 = Math.round((rawScore / 10) * 10) / 10
+
+        // Трансформируем объект критика в массив {key, title, content} для UI
+        const SECTION_LABELS: Record<string, string> = {
+          confidence: 'Уверенность',
+          nextSteps: 'Следующие шаги',
+          overallScore: 'Общая оценка',
+          reasoning: 'Обоснование',
+          stopFactors: 'Стоп-факторы',
+          weaknesses: 'Слабые места',
+        }
+        const sections = Object.entries(nested)
+          .filter(([k]) => !['overallScore', 'recommendation', 'stopFactors'].includes(k))
+          .map(([key, content]) => ({ content, key, title: SECTION_LABELS[key] ?? key }))
+
         await this.db.orm.public.Reports.create({
           ideaId,
           recommendation: rec.recommendation ?? null,
-          score: String(rec.overallScore ?? rec.score ?? null),
-          sections: JSON.parse(JSON.stringify(nested)),
+          score: String(scoreOutOf10),
+          sections: JSON.parse(JSON.stringify(sections)),
           stopFactors: JSON.parse(JSON.stringify(rec.stopFactors ?? [])),
           version: nextVersion,
         })

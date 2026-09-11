@@ -88,7 +88,7 @@ const isRunning = computed(() =>
           <span
             class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
             :class="i < currentStepIndex ? 'bg-success-soft text-success'
-              : i === currentStepIndex ? 'bg-primary text-primary-foreground'
+              : i === currentStepIndex ? 'bg-primary text-primary-foreground step-active'
                 : 'bg-muted text-muted-foreground'"
             aria-hidden="true"
           >
@@ -151,3 +151,13 @@ const isRunning = computed(() =>
     </template>
   </section>
 </template>
+
+<style scoped>
+@keyframes step-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 80, 200, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(22, 80, 200, 0); }
+}
+.step-active {
+  animation: step-pulse 2s ease-in-out infinite;
+}
+</style>

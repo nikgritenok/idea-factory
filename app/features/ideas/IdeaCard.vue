@@ -21,6 +21,28 @@ const mvpBusy = ref(false)
 const mvpResult = ref<{ classification: unknown, validated: boolean, errors: string[] } | null>(null)
 const mvpError = ref<null | string>(null)
 
+// Agent outputs state
+interface AgentOutput {
+  createdAt: string
+  formatValid: boolean
+  id: string
+  outdated: boolean
+  output: unknown
+  role: string
+  validationError: null | string
+}
+const outputs = ref<AgentOutput[]>([])
+const showOutputs = ref(false)
+const ROLE_LABELS: Record<string, string> = {
+  critic: 'Критик',
+  efficiency_analyst: 'Аналитик эффективности',
+  idea_analyst: 'Аналитик идеи',
+  market_analyst: 'Аналитик рынка',
+  orchestrator: 'Оркестратор',
+  report_editor: 'Редактор отчёта',
+  strategist: 'Стратег',
+}
+
 async function load(): Promise<void> {
   loading.value = true
   loadError.value = null
@@ -31,6 +53,12 @@ async function load(): Promise<void> {
       return
     }
     job.value = await fetchLatestJob(ideaId)
+    // Загружаем логи агентов (не критично если не загрузится)
+    try {
+      const data = await $fetch<{ outputs: AgentOutput[] }>(`/api/ideas/${ideaId}/outputs`)
+      outputs.value = data.outputs
+    }
+    catch { /* ignore */ }
   }
   catch (err: unknown) {
     loadError.value = extractApiMessage(err)
@@ -66,6 +94,7 @@ async function runAnalysis(): Promise<void> {
   try {
     const data = await $fetch<{ job: JobSummary }>(`/api/ideas/${ideaId}/run`, { method: 'POST' })
     applyJob(data.job)
+    // SSE переподключится через watch на status
   }
   catch (err: unknown) {
     actionError.value = extractApiMessage(err)
@@ -95,25 +124,59 @@ async function submitMvp(): Promise<void> {
   }
 }
 
-const pollTimer = ref<null | ReturnType<typeof setInterval>>(null)
+let eventSource: EventSource | null = null
+
+function connectSSE(): void {
+  if (eventSource) eventSource.close()
+  if (!job.value) return
+  const jobId = job.value.id
+  eventSource = new EventSource(`/api/jobs/${jobId}/stream`)
+  eventSource.onmessage = (ev) => {
+    try {
+      const data = JSON.parse(ev.data)
+      if (data.type === 'progress' || data.type === 'done') {
+        const current = job.value
+        if (current) {
+          applyJob({
+            ...current,
+            currentStep: data.currentStep,
+            error: data.error,
+            status: data.status,
+          } as JobSummary)
+        }
+      }
+    }
+    catch { /* ignore parse errors */ }
+  }
+  eventSource.onerror = () => {
+    // SSE закроется автоматически; browser переподключится (retry)
+  }
+}
 
 onMounted(async () => {
   await load()
-  pollTimer.value = setInterval(async () => {
-    if (job.value && ['queued', 'running'].includes(job.value.status)) {
-      try {
-        const data = await $fetch<{ job: JobSummary }>(`/api/jobs/${job.value.id}`)
-        applyJob({ ...data.job } as JobSummary)
-      }
-      catch {
-        // опрос статуса не критичен: следующий тик повторит попытку
-      }
-    }
-  }, 3000)
+  // Запускаем SSE если задача в процессе
+  if (job.value && ['queued', 'running'].includes(job.value.status)) {
+    connectSSE()
+  }
+})
+
+// Переподключаем SSE при смене статуса (например, после запуска анализа)
+watch(() => job.value?.status, (status) => {
+  if (status && ['queued', 'running'].includes(status)) {
+    connectSSE()
+  }
+  else if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
 })
 
 onUnmounted(() => {
-  if (pollTimer.value) clearInterval(pollTimer.value)
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
 })
 </script>
 
@@ -365,6 +428,7 @@ onUnmounted(() => {
 
           <div class="flex flex-wrap gap-3">
             <NuxtLink
+              v-if="job?.status === 'done'"
               :to="`/ideas/${idea.id}/report`"
               class="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
@@ -398,6 +462,51 @@ onUnmounted(() => {
             @resume="jobAction('resume')"
             @run="runAnalysis"
           />
+
+          <section
+            v-if="outputs.length"
+            class="space-y-3 rounded-2xl border bg-card p-6"
+          >
+            <button
+              type="button"
+              class="flex w-full items-center justify-between text-left text-sm font-bold"
+              :aria-expanded="showOutputs"
+              @click="showOutputs = !showOutputs"
+            >
+              <span>Вызовы ИИ-агентов ({{ outputs.length }})</span>
+              <Icon
+                :name="showOutputs ? 'lucide:chevron-up' : 'lucide:chevron-down'"
+                class="size-4 text-muted-foreground"
+              />
+            </button>
+            <ul
+              v-if="showOutputs"
+              class="space-y-2"
+            >
+              <li
+                v-for="out in outputs"
+                :key="out.id"
+                class="rounded-xl bg-surface p-3 text-xs"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium">{{ ROLE_LABELS[out.role] ?? out.role }}</span>
+                  <span
+                    class="rounded-full px-2 py-0.5"
+                    :class="out.formatValid ? 'bg-success-soft text-success' : 'bg-destructive/10 text-destructive'"
+                  >
+                    {{ out.formatValid ? 'OK' : 'ошибка формата' }}
+                  </span>
+                  <span
+                    v-if="out.outdated"
+                    class="rounded-full bg-accent/20 px-2 py-0.5"
+                  >устарел</span>
+                </div>
+                <p class="mt-1 text-muted-foreground">
+                  {{ new Date(out.createdAt).toLocaleString('ru-RU', { timeStyle: 'short', dateStyle: 'short' }) }}
+                </p>
+              </li>
+            </ul>
+          </section>
         </aside>
       </div>
     </template>
