@@ -1,7 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["TZ.md", "DESIGN.md"],
-  "plugin": ["opencode-tavily"],
+  "instructions": [
+    "TZ.md",
+    "DESIGN.md"
+  ],
+  "plugin": [
+    "opencode-tavily"
+  ],
   "provider": {
     "routerai": {
       "npm": "@ai-sdk/openai-compatible",
@@ -27,8 +32,22 @@
   "mcp": {
     "prisma": {
       "type": "local",
-      "command": ["npx", "-y", "prisma", "mcp"],
+      "command": [
+        "npx",
+        "-y",
+        "prisma",
+        "mcp"
+      ],
       "enabled": true
+    },
+    "shadcnVue": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "shadcn-vue@latest",
+        "mcp"
+      ]
     }
   }
 }
