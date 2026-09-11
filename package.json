@@ -23,7 +23,8 @@
     "contract:emit": "prisma contract emit",
     "contract:infer": "prisma contract infer",
     "db:sign": "prisma db sign",
-    "db:update": "prisma db update"
+    "db:update": "prisma db update",
+    "skills": "skills experimental_install",
   },
   "lint-staged": {
     "*.{ts,vue,mjs}": [
@@ -82,6 +83,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.5.0",
     "shadcn-vue": "^2.8.2",
+    "skills": "^1.5.25",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",
     "typescript-eslint": "^8.69.0",

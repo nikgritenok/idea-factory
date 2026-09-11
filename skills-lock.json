@@ -15,6 +15,12 @@
       "computedHash": "34be4d1320b6de64dd98999b253960cb8bbd6921a0854ebd361d1506dfa6f506",
       "wellKnownDigest": "sha256:1602c48107604d925c3338071ca539d72f9af1df21ba5b6e8f1977c1668e32c5"
     },
+    "playwright-cli": {
+      "source": "microsoft/playwright-cli",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-cli/SKILL.md",
+      "computedHash": "19b6942c9cbcf9b9e3000fc497f8f156b8251d66055de806017e4aaa651e0c7b"
+    },
     "review-logging-patterns": {
       "source": "evlog.dev",
       "sourceUrl": "https://www.evlog.dev",
