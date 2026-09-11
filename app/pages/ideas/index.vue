@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import FunnelBoard from '~~/app/features/funnel/FunnelBoard.vue'
 
-useSeoMeta({ title: 'Воронка идей — Фабрика идей' })
+useSeoMeta({ title: 'Список идей — Фабрика идей' })
 </script>
 
 <template>

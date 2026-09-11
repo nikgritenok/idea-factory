@@ -2,14 +2,17 @@
 const route = useRoute()
 
 const navItems = [
-  { icon: 'lucide:kanban', label: 'Воронка', to: '/ideas' },
-  { icon: 'lucide:mic', label: 'Новая идея', to: '/ideas/new' },
-  { icon: 'lucide:settings', label: 'Настройки и документация', to: '/settings' },
+  { icon: 'lucide:mic', label: 'Новая идея', to: '/' },
+  { icon: 'lucide:list', label: 'Список идей', to: '/ideas' },
+  { icon: 'lucide:settings', label: 'Настройки', to: '/settings' },
 ] as const
 
 function isActive(to: string): boolean {
   if (to === '/ideas') {
     return route.path === '/ideas' || (/^\/ideas\/[a-f0-9-]+$/.test(route.path))
+  }
+  if (to === '/') {
+    return route.path === '/'
   }
   return route.path === to
 }
@@ -27,12 +30,18 @@ function isActive(to: string): boolean {
             class="inline-flex size-9 items-center justify-center rounded-full bg-accent text-lg"
             aria-hidden="true"
           >
-            <Icon name="lucide:sun" class="size-5 text-foreground" />
+            <Icon
+              name="lucide:sun"
+              class="size-5 text-foreground"
+            />
           </span>
           <span class="text-lg font-bold tracking-tight">Фабрика идей</span>
         </NuxtLink>
 
-        <nav aria-label="Основная навигация">
+        <nav
+          aria-label="Основная навигация"
+          class="hidden md:block"
+        >
           <ul class="flex items-center gap-1 sm:gap-2">
             <li
               v-for="item in navItems"
@@ -46,7 +55,10 @@ function isActive(to: string): boolean {
                   : 'text-foreground hover:bg-surface'"
                 :aria-current="isActive(item.to) ? 'page' : undefined"
               >
-                <Icon :name="item.icon" class="size-4" />
+                <Icon
+                  :name="item.icon"
+                  class="size-4"
+                />
                 {{ item.label }}
               </NuxtLink>
             </li>
@@ -55,8 +67,10 @@ function isActive(to: string): boolean {
       </div>
     </header>
 
-    <main class="mx-auto max-w-[1200px] px-4 pb-24 pt-8 md:px-8">
+    <main class="mx-auto max-w-[1200px] px-4 pb-24 pt-8 md:px-8 md:pb-8">
       <slot />
     </main>
+
+    <MobileBottomBar />
   </div>
 </template>

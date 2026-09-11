@@ -17,6 +17,13 @@ export function useVoiceInput() {
   let startedAt = 0
   let timer: null | ReturnType<typeof setInterval> = null
 
+  function cleanupTracks(): void {
+    stream?.getTracks().forEach((t) => {
+      t.stop()
+    })
+    if (timer) clearInterval(timer)
+  }
+
   async function start(): Promise<void> {
     error.value = null
     try {
@@ -26,40 +33,32 @@ export function useVoiceInput() {
       error.value = 'Нет доступа к микрофону. Разрешите доступ в настройках браузера или введите текст.'
       return
     }
-
     chunks = []
     durationSec.value = 0
     startedAt = Date.now()
-
-    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : 'audio/webm'
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
     mediaRecorder = new MediaRecorder(stream, { mimeType: mime })
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data)
     }
     mediaRecorder.start(500)
     recording.value = true
-
     timer = setInterval(() => {
       durationSec.value = Math.round((Date.now() - startedAt) / 1000)
     }, 500)
   }
 
   async function stop(): Promise<void> {
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       if (!mediaRecorder || !recording.value) {
-        resolve(undefined)
+        resolve()
         return
       }
       mediaRecorder.onstop = () => {
         audioBlob.value = new Blob(chunks, { type: 'audio/webm' })
-        stream?.getTracks().forEach((t) => {
-          t.stop()
-        })
-        if (timer) clearInterval(timer)
+        cleanupTracks()
         recording.value = false
-        resolve(undefined)
+        resolve()
       }
       mediaRecorder.stop()
     })
@@ -96,12 +95,17 @@ export function useVoiceInput() {
     error.value = null
   }
 
-  onUnmounted(() => {
-    stream?.getTracks().forEach((t) => {
-      t.stop()
-    })
-    if (timer) clearInterval(timer)
-  })
+  function cancel(): void {
+    if (mediaRecorder && recording.value) {
+      mediaRecorder.onstop = null
+      mediaRecorder.stop()
+    }
+    cleanupTracks()
+    recording.value = false
+    reset()
+  }
 
-  return { audioBlob, durationSec, error, recording, reset, start, stop, transcribe, transcribing }
+  onUnmounted(cleanupTracks)
+
+  return { audioBlob, cancel, durationSec, error, recording, reset, start, stop, transcribe, transcribing }
 }

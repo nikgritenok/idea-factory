@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { JobSummary } from '../jobs/types'
 
-import { FUNNEL_LABELS, PRIORITY_LABELS } from './types'
 import JobProgress from '../jobs/JobProgress.vue'
-import { extractApiMessage } from './types'
+import { extractApiMessage, FUNNEL_LABELS, PRIORITY_LABELS } from './types'
 
 const route = useRoute()
 const ideaId = route.params.id as string
@@ -19,7 +18,7 @@ const busy = ref(false)
 // MVP state
 const ticketText = ref('')
 const mvpBusy = ref(false)
-const mvpResult = ref<null | { classification: unknown, validated: boolean, errors: string[] }>(null)
+const mvpResult = ref<{ classification: unknown, validated: boolean, errors: string[] } | null>(null)
 const mvpError = ref<null | string>(null)
 
 async function load(): Promise<void> {
@@ -83,8 +82,8 @@ async function submitMvp(): Promise<void> {
   mvpResult.value = null
   try {
     const data = await $fetch<{ classification: unknown, validated: boolean, errors: string[] }>(`/api/ideas/${ideaId}/mvp`, {
-      method: 'POST',
       body: { ticketText: ticketText.value.trim() },
+      method: 'POST',
     })
     mvpResult.value = data
   }
@@ -146,7 +145,7 @@ onUnmounted(() => {
         <NuxtLink
           to="/"
           class="text-sm text-muted-foreground hover:text-foreground"
-        >← Воронка</NuxtLink>
+        >← Список идей</NuxtLink>
       </nav>
 
       <div
@@ -344,7 +343,9 @@ onUnmounted(() => {
                   :key="key"
                   class="contents"
                 >
-                  <dt class="text-muted-foreground">{{ key }}</dt>
+                  <dt class="text-muted-foreground">
+                    {{ key }}
+                  </dt>
                   <dd>{{ typeof value === 'string' ? value : JSON.stringify(value) }}</dd>
                 </div>
               </dl>
@@ -368,13 +369,19 @@ onUnmounted(() => {
               class="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Открыть отчёт
-              <Icon name="lucide:arrow-right" class="size-4" />
+              <Icon
+                name="lucide:arrow-right"
+                class="size-4"
+              />
             </NuxtLink>
             <NuxtLink
               :to="`/ideas/${idea.id}/runs`"
               class="inline-flex h-12 items-center gap-2 rounded-full border px-6 text-sm font-medium transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              <Icon name="lucide:bar-chart-3" class="size-4" />
+              <Icon
+                name="lucide:bar-chart-3"
+                class="size-4"
+              />
               Прогоны и эффективность
             </NuxtLink>
           </div>

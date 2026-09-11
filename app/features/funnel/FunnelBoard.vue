@@ -125,14 +125,14 @@ const emptyText = computed(() =>
     <header class="flex flex-wrap items-end justify-between gap-4">
       <div class="space-y-1">
         <h1 class="text-[32px] font-bold leading-tight tracking-[-0.01em] text-primary">
-          Воронка идей
+          Список идей
         </h1>
         <p class="text-sm text-muted-foreground">
           Активных идей: {{ activeCount }} из {{ LIMIT }}
         </p>
       </div>
       <NuxtLink
-        to="/ideas/new"
+        to="/"
         class="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         + Новая идея

@@ -12,7 +12,7 @@ const EXECUTOR_LABELS: Record<string, string> = {
   <div class="space-y-8">
     <header class="space-y-2">
       <h1 class="text-[32px] font-bold leading-tight tracking-[-0.01em] text-primary">
-        Настройки и документация
+        Настройки
       </h1>
       <p class="text-sm text-muted-foreground">
         Управляемые параметры анализа — всё, что проверяющий может посмотреть и проверить.
@@ -110,67 +110,6 @@ const EXECUTOR_LABELS: Record<string, string> = {
           </dd>
         </div>
       </dl>
-    </section>
-
-    <section
-      class="space-y-4 rounded-2xl bg-inverse-surface p-6 text-inverse-on-surface"
-      aria-labelledby="docs-heading"
-    >
-      <h2
-        id="docs-heading"
-        class="text-lg font-bold"
-      >
-        Документация
-      </h2>
-      <ul class="space-y-2 text-sm">
-        <li>
-          <a
-            href="/docs/ARCHITECTURE"
-            class="underline hover:opacity-80"
-            target="_blank"
-            rel="noopener"
-          >
-            Архитектура (docs/ARCHITECTURE.md)
-          </a>
-          — стек, поток данных, структура проекта.
-        </li>
-        <li>
-          <a
-            href="/docs/CONVENTIONS"
-            class="underline hover:opacity-80"
-            target="_blank"
-            rel="noopener"
-          >
-            Конвенции (docs/conventions.md)
-          </a>
-          — правила кода, API, тестирования, a11y.
-        </li>
-        <li>
-          <a
-            href="/docs/DEVLOG"
-            class="underline hover:opacity-80"
-            target="_blank"
-            rel="noopener"
-          >
-            Журнал агентной разработки (DEVLOG.md)
-          </a>
-          — запрос → план → результат → проверка → исправление.
-        </li>
-        <li>
-          <a
-            href="/docs/TZ"
-            class="underline hover:opacity-80"
-            target="_blank"
-            rel="noopener"
-          >
-            ТЗ (TZ.md)
-          </a>
-          — требования к продукту.
-        </li>
-      </ul>
-      <p class="text-xs opacity-60">
-        Документация открывается из исходников репозитория; раздел растёт вместе с проектом.
-      </p>
     </section>
 
     <section

@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import CreateIdeaForm from '~~/app/features/create-idea/CreateIdeaForm.vue'
-
-useSeoMeta({ title: 'Новая идея — Фабрика идей' })
+navigateTo('/', { redirectCode: 301 })
 </script>
 
 <template>
-  <CreateIdeaForm />
+  <div />
 </template>

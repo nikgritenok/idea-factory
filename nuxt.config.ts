@@ -8,6 +8,11 @@ export default defineNuxtConfig({
     head: {
       link: [
         {
+          rel: 'icon',
+          type: 'image/svg+xml',
+          href: '/favicon.svg',
+        },
+        {
           crossorigin: '',
           href: 'https://fonts.gstatic.com',
           rel: 'preconnect',
