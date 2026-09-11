@@ -2,13 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Копируем зависимости
-COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable && pnpm install --frozen-lockfile --prod
+COPY package.json ./
+RUN npm install --omit=dev && npm install -g tsx
 
-# Копируем исходники
 COPY src/ ./src/
 
 EXPOSE 3001
 
-CMD ["node", "src/index.ts"]
+CMD ["tsx", "src/index.ts"]
