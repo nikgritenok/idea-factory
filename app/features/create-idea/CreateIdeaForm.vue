@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Priority } from '~~/shared/schemas'
-import { useVoiceInput } from './useVoiceInput'
+import { useVoiceInput } from '../voice-input/useVoiceInput'
 
 const transcript = ref('')
 const priority = ref<Priority>('medium')
@@ -38,25 +38,25 @@ function handleCancel(): void {
   cancel()
 }
 
-function handleSubmit(): void {
+async function handleSubmit(): Promise<void> {
   if (!canSubmit.value) return
   submitting.value = true
   submitError.value = null
-  $fetch<{ idea: { id: string } }>('/api/ideas', {
-    body: { priority: priority.value, source_kind: 'text', transcript: transcript.value.trim() },
-    method: 'POST',
-  })
-    .then((res) => {
-      createdIdeaId.value = res.idea.id
-      return navigateTo(`/ideas/${res.idea.id}`)
+  try {
+    const res = await $fetch<{ idea: { id: string } }>('/api/ideas', {
+      body: { priority: priority.value, source_kind: 'text', transcript: transcript.value.trim() },
+      method: 'POST',
     })
-    .catch((err: unknown) => {
-      const e = err as { data?: { error?: { message?: string } }, message?: string }
-      submitError.value = e.data?.error?.message ?? e.message ?? 'Не удалось сохранить идею'
-    })
-    .finally(() => {
-      submitting.value = false
-    })
+    createdIdeaId.value = res.idea.id
+    await navigateTo(`/ideas/${res.idea.id}`)
+  }
+  catch (err: unknown) {
+    const e = err as { data?: { error?: { message?: string } }, message?: string }
+    submitError.value = e.data?.error?.message ?? e.message ?? 'Не удалось сохранить идею'
+  }
+  finally {
+    submitting.value = false
+  }
 }
 </script>
 
