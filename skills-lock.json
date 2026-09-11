@@ -12,8 +12,8 @@
       "source": "evlog.dev",
       "sourceUrl": "https://www.evlog.dev",
       "sourceType": "well-known",
-      "computedHash": "34be4d1320b6de64dd98999b253960cb8bbd6921a0854ebd361d1506dfa6f506",
-      "wellKnownDigest": "sha256:1602c48107604d925c3338071ca539d72f9af1df21ba5b6e8f1977c1668e32c5"
+      "computedHash": "c10e91d4b8dae0a6c94633393a5dbf8755a4c53f24c8fdc036698aece3d1c81a",
+      "wellKnownDigest": "sha256:7600fc70881807ff82d4f7d2f48e8eac6d1e4edd5d3dc6c5d509dd748c63fcda"
     },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
@@ -25,8 +25,8 @@
       "source": "evlog.dev",
       "sourceUrl": "https://www.evlog.dev",
       "sourceType": "well-known",
-      "computedHash": "cfaf8a5fe8b8751854afdbf8fc81f864c99f57dac2896251eb3a93ffe3eee564",
-      "wellKnownDigest": "sha256:ecded78fbf0708a43d4a833bf0e90e3b9b1cdb6ffb1e13a02b59db036b9bafc7"
+      "computedHash": "16cbe41eda627ad6366f39542c1a93421a7ddbe0f093719f921349f2f34510fe",
+      "wellKnownDigest": "sha256:4850d715280810bc676a551fccb33f51334cca5aa709e4e69c013983196e69f8"
     },
     "shadcn-vue": {
       "source": "unovue/shadcn-vue",

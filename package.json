@@ -24,7 +24,7 @@
     "contract:infer": "prisma contract infer",
     "db:sign": "prisma db sign",
     "db:update": "prisma db update",
-    "skills": "skills experimental_install",
+    "skills": "skills experimental_install"
   },
   "lint-staged": {
     "*.{ts,vue,mjs}": [
