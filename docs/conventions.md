@@ -257,7 +257,7 @@ test('new-page has no accessibility violations', async ({ page }) => {
 | Интерактивные паттерны | `reka-ui` через `app/components/ui/*` (shadcn-vue) | исходник компонента в репо | **Нет.** Свой dialog/menu/tabs/select/tooltip — это баг, а не компонент |
 | Визуальные токены | `DESIGN.md` | `DESIGN.md` frontmatter → `app/assets/css/tailwind.css` (`@theme`) | Нет.Hex в компонентах только если токена нет |
 | Движение | `motion-v` | этот раздел + `.agents/skills/motion/best-practices/vue.md` | Только внутри списка ниже |
-| Вкус и проверка | skill `impeccable` + `agent-browser` | `.agents/skills/impeccable/reference/` | Нет. Цикл проверки обязательный |
+| Вкус и проверка | skill `impeccable` + `agent-browser` (захват доказательств) + субагент `impeccable-finish-reviewer` (вердикт) | `.agents/skills/impeccable/reference/`, `.impeccable/review/` | Нет. Цикл проверки обязательный, вердикт дизайна — не руками построившего экран |
 
 ### Motion: allowed properties
 
@@ -276,7 +276,7 @@ test('new-page has no accessibility violations', async ({ page }) => {
 
 - `opacity`-анимации он не глушит: перед снимком ждать успокоения кадра (`networkidle` + один `requestAnimationFrame`, либо `waitForFunction` на отсутствие `[data-animating]`), иначе дифф флапает.
 - В `e2e/accessibility.spec.ts` все переходы идут через `gotoQuiet()` — axe сканирует неподвижное дерево.
-- Ручная проверка: `pnpm dev`, затем `agent-browser` на `http://localhost:3000/<route>?motion=off`, desktop (1440) и mobile (360) в одном проходе.
+- Ручная проверка: `pnpm dev`, затем `agent-browser` на `http://localhost:3000/<route>?motion=off`, desktop (1440) и mobile (360) в одном проходе, файлами в `.impeccable/review/` (`desktop.png`, `mobile.png`) — это вход для ревьюера, а не иллюстрация к отчёту.
 
 ### Цикл проверки одного UI-задания (bounded passes)
 
@@ -284,10 +284,18 @@ test('new-page has no accessibility violations', async ({ page }) => {
 2. Построить полностью, не полируя по ходу.
 3. **Один** пакетный осмотр: capture-скрин desktop + mobile, `impeccable detect` по изменённым файлам, замечания critique.
 4. **Один** пакет фиксов по всем найденным дефектам сразу.
-5. **Один** подтверждающий скрин — и стоп. Дальше только к человеку.
-6. Порог выхода: `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e` зелёные + DEVLOG-строка с ручным наблюдением.
+5. **Один** подтверждающий скрин теми же файлами.
+6. **Один** вызов субагента `impeccable-finish-reviewer` — свежий контекст, вне цикла полировки. Вход: скриншоты обеих вьюпортов, режим поверхности, токены `DESIGN.md`, findings детектора, диффы. Выход: `disposition: ship|fix|rebuild|recapture` + `material_fixes` (≤8, по убыванию значимости) + `keep`. Его `disposition` передаётся человеку дословно, смягчать нельзя; `material_fixes` — одним пакетом.
+7. Порог выхода: `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e` зелёные + DEVLOG-строка с ручным наблюдением.
 
 Бесконечная само-полировка — это баг процесса: она жжёт бюджет и делает хуже, чем шаг 3–5.
+
+О дизайн-целом судит не тот контекст, который строил поверхность: он наследует её оптимизм и абстракции. Отдельный
+`impeccable-finish-reviewer` (`.opencode/agents/impeccable-finish-reviewer.md`, портирован из Codex-формата скилла
+`impeccable`) читает только пакет входов и потому ловит иерархию, «дешёвый вид» и отход от contract там, где
+детектор механически слеп. Нет скриншотов — `recapture`, частичного ревью по сломанным доказательствам не бывает.
+OpenCode не входит в список харнесов, куда `impeccable` ставит свой post-tool-use хук, поэтому механический скан
+в конце цикла обязателен руками (шаг 3), а не «когда вспомним».
 
 ### Что требует сети (и потому не входит в цикл)
 

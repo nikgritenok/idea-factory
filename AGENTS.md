@@ -89,7 +89,9 @@ throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
 - Цвета, радиусы, типографика — из `DESIGN.md` → `@theme` в `app/assets/css/tailwind.css`. Hex внутри компонента — только если токена реально нет.
 - Движение: `motion-v`, анимируем `transform` / `opacity` / `filter` / `clip-path`. Запрещено: `width/height/gap/top/left/font-size`, `transition: all`, CSS-переменная на `:root`, `repeat: Infinity` у элемента вне вьюпорта.
 - Контекст берём локально, не из сети: API и правила записи motion — `.agents/skills/motion/best-practices/vue.md`; дизайн-процесс и чек-листы — `.agents/skills/impeccable/reference/`; токены — `DESIGN.md`.
-- Цикл одной правки: построить → один пакетный осмотр (`?motion=off` скрин desktop+mobile + `impeccable detect` по изменённым файлам) → один пакет фиксов → один подтверждающий скрин → стоп. Третий раунд — вопрос человеку, а не ещё итерация.
+- Чем смотреть: интерактивный осмотр и скриншоты — `agent-browser`; регресс и a11y — `pnpm e2e`; авторинг и починка e2e-спеков — `pnpm exec playwright init-agents --loop=opencode`. Отдельный browser-CLI сверх этого не подключать.
+- Цикл одной правки: построить → один пакетный осмотр (`?motion=off` скрин desktop+mobile в `.impeccable/review/` + `impeccable detect` по изменённым файлам) → один пакет фиксов → один подтверждающий скрин → **один** вызов субагента `impeccable-finish-reviewer` (свежий контекст, вне цикла) → его `material_fixes` одним пакетом → стоп. Третий раунд полировки — вопрос человеку, а не ещё итерация.
+- Дизайн целиком судит `impeccable-finish-reviewer` (`.opencode/agents/impeccable-finish-reviewer.md`), а не тот контекст, что строил поверхность: без скриншотов он возвращает `disposition: recapture`, его `disposition` передаётся человеку дословно.
 
 ## Ground rules
 

@@ -26,8 +26,11 @@ logs
 # Playwright
 test-results/
 playwright-report/
-# Playwright CLI output (may contain credentials)
-.playwright-cli/
+
+# Impeccable: артефакты ревью и машинные настройки (в git — только config.json)
+.impeccable/review/
+.impeccable/build/
+.impeccable/config.local.json
 
 # evlog
 .evlog/
