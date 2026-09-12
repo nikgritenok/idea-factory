@@ -63,7 +63,6 @@
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "^1.17.0",
-    "@playwright/cli": "^0.1.19",
     "@playwright/test": "^1.63.0",
     "@prisma/composer": "^0.17.0",
     "@tailwindcss/vite": "^4.3.3",
