@@ -21,20 +21,14 @@ function isActive(to: string): boolean {
 <template>
   <div class="min-h-dvh bg-background text-foreground">
     <header class="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
-      <div class="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between px-4 md:px-8">
+      <div class="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between px-6 md:px-16">
         <NuxtLink
           to="/"
           class="flex items-center gap-2.5"
         >
-          <span
-            class="inline-flex size-9 items-center justify-center rounded-full bg-accent text-lg"
-            aria-hidden="true"
-          >
-            <Icon
-              name="lucide:sun"
-              class="size-5 text-foreground"
-            />
-          </span>
+          <!-- Глиф бренда из DESIGN.md (§Shapes), а не стоковая иконка: оранжевое
+               солнце на тёплом холсте, без подложки-диска. -->
+          <BrandSun class="size-9 shrink-0" />
           <span class="text-lg font-bold tracking-tight">Фабрика идей</span>
         </NuxtLink>
 
@@ -67,7 +61,7 @@ function isActive(to: string): boolean {
       </div>
     </header>
 
-    <main class="mx-auto max-w-[1200px] px-4 pb-24 pt-8 md:px-8 md:pb-8">
+    <main class="mx-auto max-w-[1200px] px-6 pb-24 pt-8 md:px-16 md:pb-8">
       <slot />
     </main>
 

@@ -2,10 +2,13 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', '@nuxt/a11y', '@sentry/nuxt/module', 'evlog/nuxt', '@nuxt/icon', 'motion-v/nuxt'],
+  modules: ['@nuxt/eslint', '@sentry/nuxt/module', 'evlog/nuxt', '@nuxt/icon', 'motion-v/nuxt'],
   devtools: { enabled: true },
   app: {
     head: {
+      // Язык документа обязателен: без него скринридер читает русскую разметку
+      // латинской раскладкой (требование доступности в TZ.md §6).
+      htmlAttrs: { lang: 'ru' },
       link: [
         {
           rel: 'icon',

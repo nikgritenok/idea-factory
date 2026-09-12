@@ -33,7 +33,7 @@ It must show at least: one bug-fix cycle and one requirement change done through
 ```bash
 pnpm dev | pnpm build | pnpm preview
 pnpm lint && pnpm typecheck && pnpm test   # verification loop before every commit
-pnpm e2e                                   # Playwright + axe-core a11y
+pnpm e2e                                   # Playwright smoke-регресс
 pnpm db:migrate | pnpm db:new <name>       # Prisma 8: apply / create migration
 pnpm worker                                # Start the queue worker
 ```
@@ -75,10 +75,10 @@ throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
 - Features live in `app/features/<name>/` (component + composable + tests). Pages are thin wrappers (`<template><FeatureName /></template>`). Shared UI in `app/components/ui/`.
 - Secrets in server-side `runtimeConfig`, never `process.env` directly. `NUXT_`/`NUXT_PUBLIC_` prefixes. Never commit `.env`.
 
-## Tests & a11y
+## Tests
 
 - Every functional change: ≥1 automated test + 1 DEVLOG.md line about manual verification. Calculation modules: reproducibility test (same input + seed → same result). Bug fixes include a regression test.
-- a11y, three layers: `eslint-plugin-vuejs-accessibility` (editor) → `@nuxt/a11y` scan (DevTools) → `e2e/accessibility.spec.ts` (CI). New page = new test there.
+- Automated a11y checks were removed by the owner's decision (2026-09-13): no `eslint-plugin-vuejs-accessibility`, no `@nuxt/a11y`, no axe spec. The accessibility requirement itself (TZ.md §6: keyboard, visible focus, labelled fields, status without color, no horizontal scroll at 390px) still stands — it is verified by markup review and by the keyboard pass inside the browser ritual, not by a scanner. Details → `docs/conventions.md` §11.
 - Interactive frontend QA / visual bug hunts: use `agent-browser` against the running dev server (`pnpm dev`). First load the workflow: `agent-browser skills get core` (+ `dogfood` for exploratory QA). Prefer refs from `snapshot -i`, re-snapshot after page changes. Playwright `e2e/` stays the CI regression suite — don't replace it with agent-browser scripts.
 - Language/tooling rules (strict TS, no `any`, Node, Vitest style) → `docs/conventions.md`.
 
@@ -89,8 +89,8 @@ throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
 - Цвета, радиусы, типографика — из `DESIGN.md` → `@theme` в `app/assets/css/tailwind.css`. Hex внутри компонента — только если токена реально нет.
 - Движение: `motion-v`, анимируем `transform` / `opacity` / `filter` / `clip-path`. Запрещено: `width/height/gap/top/left/font-size`, `transition: all`, CSS-переменная на `:root`, `repeat: Infinity` у элемента вне вьюпорта.
 - Контекст берём локально, не из сети: API и правила записи motion — `.agents/skills/motion/best-practices/vue.md`; дизайн-процесс и чек-листы — `.agents/skills/impeccable/reference/`; токены — `DESIGN.md`.
-- Чем смотреть: интерактивный осмотр и скриншоты — `agent-browser`; регресс и a11y — `pnpm e2e`; авторинг и починка e2e-спеков — `pnpm exec playwright init-agents --loop=opencode`. Отдельный browser-CLI сверх этого не подключать.
-- Цикл одной правки: построить → один пакетный осмотр (`?motion=off` скрин desktop+mobile в `.impeccable/review/` + `impeccable detect` по изменённым файлам) → один пакет фиксов → один подтверждающий скрин → **один** вызов субагента `impeccable-finish-reviewer` (свежий контекст, вне цикла) → его `material_fixes` одним пакетом → стоп. Третий раунд полировки — вопрос человеку, а не ещё итерация.
+- Чем смотреть: интерактивный осмотр и скриншоты — `agent-browser`; регресс — `pnpm e2e`; авторинг и починка e2e-спеков — `pnpm exec playwright init-agents --loop=opencode`. Отдельный browser-CLI сверх этого не подключать.
+- Цикл одной правки: построить → один пакетный осмотр (`?motion=off` скрин desktop+mobile в `.impeccable/review/` + `impeccable detect` по изменённым файлам + клавиатурный проход по фокусу) → один пакет фиксов → один подтверждающий скрин → **один** вызов субагента `impeccable-finish-reviewer` (свежий контекст, вне цикла) → его `material_fixes` одним пакетом → стоп. Третий раунд полировки — вопрос человеку, а не ещё итерация.
 - Дизайн целиком судит `impeccable-finish-reviewer` (`.opencode/agents/impeccable-finish-reviewer.md`), а не тот контекст, что строил поверхность: без скриншотов он возвращает `disposition: recapture`, его `disposition` передаётся человеку дословно.
 
 ## Ground rules

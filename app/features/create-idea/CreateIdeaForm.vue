@@ -63,13 +63,13 @@ async function handleSubmit(): Promise<void> {
 <template>
   <div class="mx-auto max-w-[720px] space-y-8">
     <header class="space-y-2">
-      <p class="text-sm font-medium text-muted-foreground">
+      <p class="text-label-sm font-medium tracking-label-sm text-muted-foreground">
         Новая идея
       </p>
-      <h1 class="text-[32px] font-bold leading-tight tracking-[-0.01em] text-primary">
+      <h1 class="text-headline-lg font-bold leading-[1.2] tracking-headline-lg text-primary">
         Опишите идею текстом или голосом
       </h1>
-      <p class="text-sm leading-6 text-muted-foreground">
+      <p class="max-w-[68ch] text-body-lg leading-[1.6] text-muted-foreground">
         Расскажите, какой процесс хотите автоматизировать или улучшить — система превратит текст в карточку
         идеи, поставит её в очередь и запустит исследование.
       </p>
@@ -84,11 +84,13 @@ async function handleSubmit(): Promise<void> {
     </div>
 
     <form
-      class="space-y-6 rounded-2xl border bg-card p-6"
+      class="space-y-6 rounded-lg border border-border bg-card p-6"
       @submit.prevent="handleSubmit"
     >
       <div class="space-y-2">
         <div class="relative">
+          <!-- §Forms & Inputs: белый фон, радиус 8px, body-md 16px (14px в поле даёт
+               focus-zoom на iOS), рамка 1px #E2DFD8, фокус — синяя рамка. -->
           <textarea
             id="transcript"
             v-model="transcript"
@@ -97,7 +99,7 @@ async function handleSubmit(): Promise<void> {
             minlength="10"
             :disabled="recording || transcribing"
             :placeholder="recording ? 'Идёт запись…' : 'Опишите идею…'"
-            class="w-full resize-none rounded-xl border bg-background px-4 py-3 pr-24 text-sm leading-6 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full resize-none rounded-sm border border-border bg-surface-bright px-3 py-3 text-body-md leading-[1.6] pr-24 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-foreground"
           />
 
           <div class="absolute right-2 top-2 flex items-center gap-1">
@@ -107,7 +109,7 @@ async function handleSubmit(): Promise<void> {
                 type="submit"
                 :disabled="!canSubmit"
                 aria-label="Отправить идею"
-                class="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                class="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-foreground"
               >
                 <Icon name="lucide:send" class="size-4" />
               </button>
@@ -133,7 +135,7 @@ async function handleSubmit(): Promise<void> {
               <button
                 type="button"
                 aria-label="Остановить запись и расшифровать"
-                class="inline-flex size-9 items-center justify-center rounded-full bg-success text-white transition-colors hover:bg-success/90"
+                class="inline-flex size-9 items-center justify-center rounded-full bg-success text-on-primary transition-colors hover:bg-success/90"
                 @click="handleConfirm"
               >
                 <Icon name="lucide:check" class="size-4" />
@@ -164,7 +166,7 @@ async function handleSubmit(): Promise<void> {
 
         <p
           v-if="recording"
-          class="text-center text-xs text-muted-foreground"
+          class="text-center text-body-sm text-muted-foreground"
           role="status"
         >
           Запись · {{ durationSec }} с
@@ -172,7 +174,7 @@ async function handleSubmit(): Promise<void> {
 
         <p
           v-if="transcribing"
-          class="text-center text-xs text-muted-foreground"
+          class="text-center text-body-sm text-muted-foreground"
           role="status"
         >
           Расшифровываем…
@@ -180,7 +182,7 @@ async function handleSubmit(): Promise<void> {
 
         <p
           v-if="error"
-          class="text-sm text-destructive"
+          class="text-body-sm text-destructive"
           role="alert"
         >
           {{ error }}
@@ -188,13 +190,13 @@ async function handleSubmit(): Promise<void> {
 
         <p
           v-if="hasText && transcript.trim().length < 10 && !recording"
-          class="text-sm text-destructive"
+          class="text-body-sm text-destructive"
           role="alert"
         >
           Опишите идею подробнее — минимум 10 символов.
         </p>
 
-        <p class="text-right text-xs text-muted-foreground">
+        <p class="text-right text-body-sm text-muted-foreground">
           {{ transcript.trim().length }} символов
         </p>
       </div>
@@ -211,7 +213,7 @@ async function handleSubmit(): Promise<void> {
         <div class="space-y-2">
           <span
             id="priority-label"
-            class="text-sm font-medium text-muted-foreground"
+            class="text-label-sm font-medium tracking-label-sm text-muted-foreground"
           >Приоритет</span>
           <div
             role="radiogroup"
@@ -224,7 +226,7 @@ async function handleSubmit(): Promise<void> {
               type="button"
               role="radio"
               :aria-checked="priority === opt.value"
-              class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="rounded-full px-4 py-1.5 text-label-md font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               :class="priority === opt.value ? 'bg-primary-soft text-primary' : 'text-foreground'"
               @click="priority = opt.value"
             >
@@ -233,10 +235,12 @@ async function handleSubmit(): Promise<void> {
           </div>
         </div>
 
+        <!-- §Buttons: pill, h-48, label-md; §Forms: primary формы — на всю ширину
+             колонки. Неактивное состояние — дизайн из токенов, а не opacity-50. -->
         <button
           type="submit"
           :disabled="!canSubmit"
-          class="inline-flex h-12 w-full items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-auto"
+          class="inline-flex h-12 w-full items-center justify-center rounded-full border border-transparent bg-primary px-6 text-label-md font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-bright disabled:text-muted-foreground"
         >
           {{ submitting ? 'Сохраняем…' : 'Сохранить идею' }}
         </button>
@@ -246,12 +250,14 @@ async function handleSubmit(): Promise<void> {
 </template>
 
 <style scoped>
+/* §15: амплитуда на transform: scaleY, а не height (layout-сдвиг каждый кадр). */
 .audio-bar {
   display: inline-block;
   width: 3px;
-  height: 12px;
-  border-radius: 2px;
+  height: 20px;
+  border-radius: var(--radius-full);
   background-color: var(--color-primary);
+  transform-origin: center;
   animation: audio-wave 0.8s ease-in-out infinite;
 }
 
@@ -264,7 +270,7 @@ async function handleSubmit(): Promise<void> {
 .audio-bar:nth-child(7) { animation-delay: 0s; }
 
 @keyframes audio-wave {
-  0%, 100% { height: 6px; }
-  50% { height: 20px; }
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
 }
 </style>

@@ -172,48 +172,29 @@ export default defineEventHandler(async (event) => {
 - Unit: Vitest. Components: `@vue/test-utils` + Vitest. API: `nitro-test` or plain HTTP tests.
 - Tests are co-located: `*.test.ts` / `*.spec.ts`.
 
-## 11. Accessibility (a11y)
+## 11. Доступность (a11y)
 
-Accessibility is enforced at three levels. All three must pass before merging frontend changes.
+Требование остаётся (TZ.md §6): работа с клавиатуры, видимый фокус, подписи полей, статус понятен
+без цвета, на 390px основные действия без горизонтальной прокрутки.
 
-### Editor-time: eslint-plugin-vuejs-accessibility
+Автоматические проверки сняты по решению владельца от 2026-09-13: из репозитория убраны
+`eslint-plugin-vuejs-accessibility` (линтер), `@nuxt/a11y` (скан в DevTools) и
+`e2e/accessibility.spec.ts` вместе с `@axe-core/playwright`. Честное следствие: регресс
+доступности больше не ловится машиной — зелёный `pnpm e2e` не означает, что a11y не сломана.
 
-ESLint rules catch common a11y mistakes in Vue templates as you type:
-- Missing `alt` on `<img>`
-- Missing labels on form controls
-- Click events without keyboard equivalents
-- Invalid ARIA attributes
+Как проверяем без сканера:
 
-Run with `pnpm lint`. Fix all `vuejs-accessibility/*` errors before committing.
+- **Разметка — часть ревью диффа.** `aria-*`, `role`, `label`/`for`, `alt` смотрим в коде; интерактив
+  берём только из `app/components/ui/*` (reka-ui), где клавиатура и фокус реализованы примитивом.
+- **Клавиатурный проход в ритуале осмотра** (§15): Tab по всем состояниям экрана, фокус виден на каждом
+  шаге, оверлей возвращает фокус и закрывается по Esc.
+- **Контраст считается по парам токенов** `DESIGN.md` (§Colors), а не на глаз: новый hex внутри
+  компонента — непроверенная пара, поэтому он и запрещён.
+- **Статус читается текстом:** состояния (пусто / ошибка / загрузка) покрыты `pnpm test`, а не только
+  цветом рамки.
 
-### Runtime: @nuxt/a11y (DevTools)
-
-The `@nuxt/a11y` module runs axe-core in the browser during development:
-- Open Nuxt DevTools → "Nuxt a11y" tab
-- Click "Scan" to check the current page
-- Violations are grouped by severity (critical → minor)
-- Click a violation to highlight affected elements with numbered badges
-- Enable "Auto-Scan" for continuous monitoring
-
-Use this when building new pages or components — catch issues visually before they reach CI.
-
-### CI: @axe-core/playwright
-
-Automated regression tests in `e2e/accessibility.spec.ts`:
-- Run via `pnpm e2e`
-- Tests scan key pages (homepage, ideas list, idea detail) against WCAG 2.0/2.1 AA
-- Any violation fails the test — blocks merge
-
-When adding a new page, add a corresponding test:
-```ts
-test('new-page has no accessibility violations', async ({ page }) => {
-  await page.goto('/new-page')
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'])
-    .analyze()
-  expect(results.violations).toEqual([])
-})
-```
+Что нашёл сканер и остаётся исправленным после его удаления: `<html lang="ru">` — без языка документа
+скринридер читает русскую разметку латинской раскладкой.
 
 ## 12. Comments & Docs
 
@@ -272,11 +253,11 @@ test('new-page has no accessibility violations', async ({ page }) => {
 
 ### Capture-режим
 
-`?motion=off` → `reducedMotion: "always"` → transform/layout выключены. Нужен для того, чтобы скриншот и axe не зависели от тайминга.
+`?motion=off` → `reducedMotion: "always"` → transform/layout выключены. Нужен для того, чтобы скриншот и клавиатурный проход не зависели от тайминга.
 
 - `opacity`-анимации он не глушит: перед снимком ждать успокоения кадра (`networkidle` + один `requestAnimationFrame`, либо `waitForFunction` на отсутствие `[data-animating]`), иначе дифф флапает.
-- В `e2e/accessibility.spec.ts` все переходы идут через `gotoQuiet()` — axe сканирует неподвижное дерево.
 - Ручная проверка: `pnpm dev`, затем `agent-browser` на `http://localhost:3000/<route>?motion=off`, desktop (1440) и mobile (360) в одном проходе, файлами в `.impeccable/review/` (`desktop.png`, `mobile.png`) — это вход для ревьюера, а не иллюстрация к отчёту.
+- Гигиена захвата (проверено на живом экране): путь к скрину — **абсолютный** (относительный `screenshot --full ./x.png` CLI принимает за селектор и молча кладёт файл в свой tmp-каталог); островок DevTools удалять из DOM перед снимком — `eval "document.getElementById('nuxt-devtools-container')?.remove()"`, иначе он попадает и в кадр, и в скан; экран с `position: fixed` (мобильная таб-панель) снимать **двумя вьюпортами** — scroll 0 и document end, а не `--full`: полностраничный скрин рисует фиксированный бар посреди документа, и по нему «окклюзия» выглядит правдой, хотя измерение даёт 39px запаса.
 
 ### Цикл проверки одного UI-задания (bounded passes)
 
@@ -301,5 +282,5 @@ OpenCode не входит в список харнесов, куда `impeccabl
 
 - `impeccable context` / `detect` дёргают лаунчер, который один раз скачивает бинарь с `impeccable.style`. Без него скилл работает в degraded-режиме: читает `PRODUCT.md`/`DESIGN.md` напрямую, механические проверки прогоняются руками.
 - Motion MCP (хостед) — только поиск по актуальным докам; правила для записи кода лежат локально в `.agents/skills/motion/best-practices/`.
-- `web-design-guidelines` подтягивает список правил из сети на каждый запуск — в этом репо его заменяют `@nuxt/a11y` + `vuejs-accessibility` + axe (§11).
+- `web-design-guidelines` подтягивает список правил из сети на каждый запуск — в этом репо его заменяют механический `impeccable detect` + ревью разметки и клавиатурный проход (§11).
 - `skills-lock.json` фиксирует версии скиллов: обновление — осознанный коммит, а не рантайм-зависимость.

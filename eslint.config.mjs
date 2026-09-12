@@ -11,7 +11,6 @@ import noSecrets from 'eslint-plugin-no-secrets'
 import regexp from 'eslint-plugin-regexp'
 import eslintComments from '@eslint-community/eslint-plugin-eslint-comments'
 import perfectionist from 'eslint-plugin-perfectionist'
-import vuejsAccessibility from 'eslint-plugin-vuejs-accessibility'
 
 export default withNuxt(
   {
@@ -350,21 +349,6 @@ export default withNuxt(
       'vue/no-setup-props-reactivity-loss': 'error',
     },
   },
-
-  // @ts-expect-error vuejs-accessibility types incompatible with flat config
-  ...vuejsAccessibility.configs['flat/recommended'].map(config => ({
-    ...config,
-    files: ['**/*.vue'],
-    rules: {
-      ...config.rules,
-      // label с for+id вне label — валидный паттерн (a11y корректен)
-      'vuejs-accessibility/label-has-for': ['error', {
-        components: [],
-        controlComponents: [],
-        required: { some: ['nesting', 'id'] },
-      }],
-    },
-  })),
 
   {
     files: ['**/*.ts'],
