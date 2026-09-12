@@ -21,6 +21,18 @@
       "computedHash": "c10e91d4b8dae0a6c94633393a5dbf8755a4c53f24c8fdc036698aece3d1c81a",
       "wellKnownDigest": "sha256:7600fc70881807ff82d4f7d2f48e8eac6d1e4edd5d3dc6c5d509dd748c63fcda"
     },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "a80e96114cca1a7324c3b5b72586b93687a12a2a05302563fa81e1e30987a049"
+    },
+    "motion": {
+      "source": "motiondivision/cursor-plugin",
+      "sourceType": "github",
+      "skillPath": "plugins/motion/skills/motion/SKILL.md",
+      "computedHash": "3c8f6f40f83820e8d0366e9187444365680e169d9394a03b7cd2ec2e6b711f19"
+    },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
       "sourceType": "github",
