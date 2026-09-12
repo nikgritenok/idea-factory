@@ -1,5 +1,25 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-13 / шаг 10] Дизайн-система фронтенда: motion-v + impeccable + capture-режим
+**Запрос:** собрать повторяемую систему, чтобы AI-агент сам придумывал дизайн, проверял его в браузере, находил визуальные и a11y-дефекты и держал премиальный вид с дорогими анимациями — без похода в интернет на каждую задачу.
+**План:** (1) скиллы `impeccable` (процесс и вкус) и `motion` (официальный, от Motion) через skills CLI в `.agents/skills` + пин в `skills-lock.json`; (2) `motion-v` как единственная движущая сила, политика на всё дерево в `app/app.vue`; (3) capture-режим `?motion=off` для детерминированных скриншотов и стабильного axe; (4) правила слоя в `docs/conventions.md §15` + короткий блок в AGENTS.md; (5) точка входа `/ui`.
+**Результат:**
+- `.agents/skills/impeccable` (v4.3.1, 343 коммита в скилле, контент 2026-09-10) и `.agents/skills/motion` (лучшие практики, включая `best-practices/vue.md`) — лежат в `.agents/`, который в `.gitignore`; в git попал только `skills-lock.json`, воспроизводится `pnpm skills`
+- Проверен вариант impeccable: приехавший `SKILL.md` ссылается на `.agents/skills/impeccable/scripts/impeccable` (3/3 совпадения) — это рабочая копия, а не `.opencode`-вариант с чужими путями
+- `motion-v@2.4.2` + модуль `motion-v/nuxt`; `MotionConfig :reduced-motion` в `app/app.vue`
+- `e2e/accessibility.spec.ts`: все переходы через `gotoQuiet()` с `?motion=off`, axe сканирует неподвижное дерево
+- `docs/conventions.md` §15 (слои, разрешённые свойства анимаций, capture-режим, bounded-цикл, что требует сети) + AGENTS.md «Frontend: дизайн-система»
+- `.opencode/commands/ui.md` — один вход в цикл
+**Проверка:**
+- `pnpm typecheck` — exit 0, 0 ошибок (то есть модуль и авто-импорт `MotionConfig` реально резолвятся)
+- `pnpm lint` по затронутым файлам — чисто; по репозиторию 160 ошибок против 159 на baseline, дельта +1 = порядок импортов в моём e2e-файле, исправлено `--fix`
+- `pnpm test` — 6 failed / 52 passed, идентично baseline (`git stash` прогон): падает только backend (queue/llm/ideas), новых падений 0
+- на живом dev-сервере + `agent-browser`, пробная страница `<motion.div :animate="{x:80, duration:3}">`: обычный режим → первый кадр `transform: none`, через 4 с `matrix(1,0,0,1,80,0)`; `?motion=off` → **первый кадр уже** `matrix(1,0,0,1,80,0)`. То есть capture-режим действительно глушит transform
+- там же проверено утверждение про opacity: под `always` opacity продолжает анимироваться (первый кадр `0.117`, после стабилизации `1`) — поэтому правило «перед снимком ждать успокоения кадра», а не «capture решает всё»
+- `skipAnimations` в `MotionConfig` проверен по исходникам `motion-v@2.4.2`: доходит только до императивного `useAnimate`, для `<motion.*>` no-op — в конвенциях запрещён
+- `pnpm exec playwright test e2e/accessibility.spec.ts` — 1 passed, 2 failed; те же 2 падают и без моей правки. **Найдено реальных дефектов приложения:** у `<html>` нет `lang`, `#888888` на `#ffffff` = контраст 3.54 при норме 4.5, контент вне landmark (`region`). Chromium для Playwright ранее не был установлен, поэтому a11y-суиту никто не прогонял
+**Fixes:** (1) первый замер capture-режима был неверным — сравнивал финальный кадр после 2 с ожидания, где анимация уже завершилась; перемерено с `duration: 3` и отбором кадра сразу после загрузки; (2) импорт `MotionConfigProps` из `motion-v` не экспортируется — убран, тип выводится из литералов; (3) порядок импортов в e2e поправлен eslint `--fix`; (4) пробная страница `app/pages/motion-probe.vue` удалена, в дерево не попала
+
 ## [2026-09-10 / шаг 9] Инфраструктура и деплой (CI/CD + Docker)
 **Запрос:** настроить продакшен-инфраструктуру — Docker multi-stage, docker-compose.prod.yml, healthcheck, миграции, деплой.
 **План:** (1) healthcheck endpoint; (2) Dockerfile multi-stage + non-root; (3) docker-compose.prod.yml; (4) .dockerignore; (5) деплой + smoke test; (6) ARCHITECTURE.md.

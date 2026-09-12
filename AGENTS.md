@@ -82,6 +82,15 @@ throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
 - Interactive frontend QA / visual bug hunts: use `agent-browser` against the running dev server (`pnpm dev`). First load the workflow: `agent-browser skills get core` (+ `dogfood` for exploratory QA). Prefer refs from `snapshot -i`, re-snapshot after page changes. Playwright `e2e/` stays the CI regression suite — don't replace it with agent-browser scripts.
 - Language/tooling rules (strict TS, no `any`, Node, Vitest style) → `docs/conventions.md`.
 
+## Frontend: дизайн-система
+
+- UI-задача начинается с режима поверхности: `operate` (продуктовые экраны) / `persuade` (витрина) / `read`. Полные правила → `docs/conventions.md` §15.
+- Интерактив — только из `app/components/ui/*` (reka-ui/shadcn-vue). Свой dialog/menu/tabs/select/tooltip считается багом: a11y нельзя проверить скриншотом, она наследуется от примитива.
+- Цвета, радиусы, типографика — из `DESIGN.md` → `@theme` в `app/assets/css/tailwind.css`. Hex внутри компонента — только если токена реально нет.
+- Движение: `motion-v`, анимируем `transform` / `opacity` / `filter` / `clip-path`. Запрещено: `width/height/gap/top/left/font-size`, `transition: all`, CSS-переменная на `:root`, `repeat: Infinity` у элемента вне вьюпорта.
+- Контекст берём локально, не из сети: API и правила записи motion — `.agents/skills/motion/best-practices/vue.md`; дизайн-процесс и чек-листы — `.agents/skills/impeccable/reference/`; токены — `DESIGN.md`.
+- Цикл одной правки: построить → один пакетный осмотр (`?motion=off` скрин desktop+mobile + `impeccable detect` по изменённым файлам) → один пакет фиксов → один подтверждающий скрин → стоп. Третий раунд — вопрос человеку, а не ещё итерация.
+
 ## Ground rules
 
 - Be conservative, explicit, and boring. When unsure, ask; don't guess.

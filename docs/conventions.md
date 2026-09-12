@@ -247,3 +247,51 @@ test('new-page has no accessibility violations', async ({ page }) => {
 - No unnecessary diff churn.
 - No accidental top-level side effects.
 - Env usage is validated and intentional.
+
+## 15. Дизайн и движение (motion-v + impeccable)
+
+Фронтенд собирается из четырёх слоёв, каждый со своим источником истины:
+
+| Слой | Инструмент | Истина | Можно ли изобретать руками |
+| --- | --- | --- | --- |
+| Интерактивные паттерны | `reka-ui` через `app/components/ui/*` (shadcn-vue) | исходник компонента в репо | **Нет.** Свой dialog/menu/tabs/select/tooltip — это баг, а не компонент |
+| Визуальные токены | `DESIGN.md` | `DESIGN.md` frontmatter → `app/assets/css/tailwind.css` (`@theme`) | Нет.Hex в компонентах только если токена нет |
+| Движение | `motion-v` | этот раздел + `.agents/skills/motion/best-practices/vue.md` | Только внутри списка ниже |
+| Вкус и проверка | skill `impeccable` + `agent-browser` | `.agents/skills/impeccable/reference/` | Нет. Цикл проверки обязательный |
+
+### Motion: allowed properties
+
+`MotionConfig` стоит в `app/app.vue` и задаёт политику на всё дерево.
+
+- Разрешено анимировать: `transform` (`x/y/scale/rotate`), `opacity`, `filter`, `clip-path`, `mask`. Это compositor-уровень, он не дёргает layout.
+- Запрещено: `width`, `height`, `margin`, `padding`, `gap`, `top/left`, `font-size` (перестройка layout каждый кадр); CSS-переменная на `:root` («плавный theme switch» этим способом — самый частый self-inflicted jank); `transition: all`; `repeat: Infinity` у элемента, который может быть вне вьюпорта (ворот `whileInView`); `layout`/`layoutId` внутри списков длиннее ~20 узлов.
+- Четыре глагола, другого не изобретаем: `state` (`:animate`, `whileHover/whilePress/whileFocus`), `enter` (`whileInView` + `clip-path`/mask-reveal, stagger 40–60 ms), `shared` (`layout`, `layoutId`, `LayoutGroup`), `scroll-linked` (`useScroll` + `useTransform` → `:style`).
+- Продуктовые экраны (funnel, таблицы прогонов, настройки, форма создания идеи) = `state` + короткий `enter`. `scroll-linked` и `shared` — только на persuading-поверхностях (лендинг, витрина).
+- Auto-import покрывает `Motion`, `AnimatePresence`, `LayoutGroup`, `MotionConfig`, `ReorderGroup/Item`, `M` и хуки (`useScroll`, `useTransform`, `useReducedMotion`, …). Строчечный `motion.div` **не** авто-импортируется — `import { motion } from 'motion-v'`.
+- `skipAnimations` в `MotionConfig` для declarative-компонентов не использовать: в `motion-v@2.4.2` он доходит только до императивного `useAnimate`.
+
+### Capture-режим
+
+`?motion=off` → `reducedMotion: "always"` → transform/layout выключены. Нужен для того, чтобы скриншот и axe не зависели от тайминга.
+
+- `opacity`-анимации он не глушит: перед снимком ждать успокоения кадра (`networkidle` + один `requestAnimationFrame`, либо `waitForFunction` на отсутствие `[data-animating]`), иначе дифф флапает.
+- В `e2e/accessibility.spec.ts` все переходы идут через `gotoQuiet()` — axe сканирует неподвижное дерево.
+- Ручная проверка: `pnpm dev`, затем `agent-browser` на `http://localhost:3000/<route>?motion=off`, desktop (1440) и mobile (360) в одном проходе.
+
+### Цикл проверки одного UI-задания (bounded passes)
+
+1. Прочитать `DESIGN.md` (он и так в `instructions`), определить режим поверхности: `persuade` / `operate` / `read`.
+2. Построить полностью, не полируя по ходу.
+3. **Один** пакетный осмотр: capture-скрин desktop + mobile, `impeccable detect` по изменённым файлам, замечания critique.
+4. **Один** пакет фиксов по всем найденным дефектам сразу.
+5. **Один** подтверждающий скрин — и стоп. Дальше только к человеку.
+6. Порог выхода: `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e` зелёные + DEVLOG-строка с ручным наблюдением.
+
+Бесконечная само-полировка — это баг процесса: она жжёт бюджет и делает хуже, чем шаг 3–5.
+
+### Что требует сети (и потому не входит в цикл)
+
+- `impeccable context` / `detect` дёргают лаунчер, который один раз скачивает бинарь с `impeccable.style`. Без него скилл работает в degraded-режиме: читает `PRODUCT.md`/`DESIGN.md` напрямую, механические проверки прогоняются руками.
+- Motion MCP (хостед) — только поиск по актуальным докам; правила для записи кода лежат локально в `.agents/skills/motion/best-practices/`.
+- `web-design-guidelines` подтягивает список правил из сети на каждый запуск — в этом репо его заменяют `@nuxt/a11y` + `vuejs-accessibility` + axe (§11).
+- `skills-lock.json` фиксирует версии скиллов: обновление — осознанный коммит, а не рантайм-зависимость.
