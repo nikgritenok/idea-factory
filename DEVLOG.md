@@ -49,18 +49,38 @@ promises; `console.log` метрик LLM → `log.info` evlog; `env.X = env.X` �
 `STT_KEY_PLACEHOLDER`; вариант `if (!…) … =` отвергнут `prefer-nullish-coalescing`, а `??=` оставлен
 после замера: в окружении vitest ключ именно `undefined`, не пустая строка, так что `??=` покрывает
 случай и тесты на нём зелёные.
-**Проверка:** `pnpm lint` → **58 errors / 0 warnings** против **152 / 5** до чистки и 157/158 по
+**Проверка:** `pnpm lint` → **37 errors / 0 warnings** против **152 / 5** до чистки и 157/158 по
 записанному baseline; parsing-ошибок 0; `pnpm typecheck` → exit 0; `pnpm test` → **6 failed / 60 passed**
 — идентично baseline этого же коммита, новых падений 0; микросервис-валидатор поднят через `tsx` и
 проверен живьём: `/version` → `1.0.0`, `/validate` → `{"valid":true,"errors":[]}`, на плохую пару →
 ошибка схемы, на битый JSON → `{"valid":false,"errors":["Некорректный JSON"]}` (это путь в изменённом
 `parseBody`).
-**Остаток 58 — осознанно не правлю молча:** 23 `slop/no-chained-type-assertions` и ~26
-`@typescript-eslint/no-unsafe-*` почти целиком в `server/queue/*` (`as unknown as JobRow` на строках
-Prisma, `schema: XSchema as unknown as X` в конфигах ролей) плюс `max-lines`/`max-params`/
-cognitive-complexity в `worker.ts`. Это рефакторинг с поведенческой поверхностью в коде, чьи тесты
-красные с baseline (нужны ROUTERAI_API_KEY и тестовая БД) — чинить их вслепую означало бы выдать
-непроверенное за проверенное. Варианты и цена — в отчёте человеку.
+Дополнительно снято после первого коммита чистки (58 → 50 → 37):
+- `config/roles/*` — поле `schema` хранило Zod-схему, будучи объявленным типом **результата**
+  валидации; `as unknown as X` ничего не обеспечивал (у литерала нет аннотации), минус 6 утверждений,
+  мёртвые импорты типов убраны. `scripts/test-roles.ts` вызывает `callLlm(llm.schema, …)` без каста —
+  то есть схема там и ожидалась
+- тулинг у корня (`prisma.config`, `playwright.config`, `vitest.config`, `e2e/**`, `scripts/**`) —
+  снят только тип-aware шум от того, что `defaultProject` не включает node-типы; все прочие правила
+  продолжают действовать (минус 12)
+- `comparison.ts` — `as unknown as RunCallRow[]` оказался не нужен: строки Prisma и так подходили,
+  интерфейс стал мёртвым
+- `validator-client.ts` — `JSON.parse(JSON.stringify(unknown))` (возвращает any) заменён явным
+  снимком; попутно это чинит и реальный дефект: на `response === undefined` старый код бросал
+  SyntaxError. Проверено живым прогоном: в `run_calls` легли ровно `{"category":"жалоба",
+  "priority":"high","responsibleDepartment":"Техподдержка"}` и `{"valid":true,"errors":[]}`;
+  пробные строки из dev-БД удалены (1 идея, 1 прогон, 0 остатка)
+- `scripts/test-roles.ts` — аргументы CLI проверяются против `LLM_ROLES` с внятным отказом вместо
+  слепого сужения типом
+
+**Остаток 37 — и это один модуль:** 36 из 37 в `server/queue/**` (`worker.ts` 10, `enqueue.ts` 6,
+`controls.ts` 6, `calc-executor.ts` 4, `run-protocol.ts` 3, `claim.ts` 3, `worker.test.ts` 3,
+`llm-executor.ts` 1) + `max-lines` в `IdeaCard.vue` (479 при 350). Это в основном
+`as unknown as JobRow` на строках Prisma и следствия `unknown`-полей в протоколе прогона, плюс
+`max-params`/cognitive-complexity/`max-lines` в `worker.ts`. Правка каждого — смена типов или
+реструктуризация воркера, а тесты очереди красные с baseline (нужны ROUTERAI_API_KEY и тестовая БД
+на 5434), то проверить «на зелёном» сейчас нельзя. Вариант «пробежать по ним молча» означал бы
+выдать непроверенное за проверенное — оставлено как решение человека.
 
 ## [2026-09-14 / шаг 19] Клиент читает ошибки через `parseError`; починен user-visible дефект текста ошибки
 **Запрос:** продолжение задания, согласованное решение «да, правим фронт под evlog».

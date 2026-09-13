@@ -476,6 +476,22 @@ export default withNuxt(
     },
   },
 
+  // Файлы тулинга у корня, e2e и scripts лежат вне программ Nuxt, а defaultProject
+  // (.nuxt/tsconfig.app.json) не включает types:["node"] — отсюда «process/console —
+  // тип не резолвится». Отдать их в реальный проект нельзя: include в корневом
+  // solution-style tsconfig ломает pnpm typecheck (TS6306/TS6310, проверено).
+  // Снимаем только type-aware последствия; остальные правила для них действуют.
+  {
+    files: ['prisma.config.ts', 'playwright.config.ts', 'vitest.config.ts', 'e2e/**/*.ts', 'scripts/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+
   // Сгенерированные обёртки shadcn-vue: `useVModel(props, 'modelValue', emits, { defaultValue:
   // props.defaultValue })` читает проп один раз намеренно — это стартовое значение на момент
   // монтирования, а не реактивная величина; правило ловит тут контракт shadcn, а не баг.

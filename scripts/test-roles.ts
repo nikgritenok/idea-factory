@@ -76,7 +76,16 @@ async function testRole(role: (typeof LLM_ROLES)[number]): Promise<boolean> {
 }
 
 const requested = process.argv.slice(2)
-const roles = requested.length ? (requested as unknown as (typeof LLM_ROLES)[number][]) : [...LLM_ROLES]
+const known = new Set<string>(LLM_ROLES)
+const unknown = requested.filter(r => !known.has(r))
+if (unknown.length) {
+  console.error(`Неизвестные роли: ${unknown.join(', ')}. Доступны: ${LLM_ROLES.join(', ')}`)
+  process.exit(1)
+}
+
+// Было `requested as unknown as (typeof LLM_ROLES)[number][]` — сужение аргументов CLI
+// без проверки. Теперь имена проверены выше, а утверждение не нужно.
+const roles: readonly string[] = requested.length ? requested : [...LLM_ROLES]
 
 let passed = 0
 for (const role of roles) {

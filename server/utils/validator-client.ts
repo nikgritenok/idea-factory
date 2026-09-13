@@ -81,8 +81,15 @@ export async function validateRules(
       durationMs: callRecord.durationMs,
       error: callRecord.error ?? null,
       ok: callRecord.ok,
-      request: JSON.parse(JSON.stringify(callRecord.request)),
-      response: JSON.parse(JSON.stringify(callRecord.response)),
+      // request/response в RunCallRecord объявлены как unknown, а колонка — jsonb.
+      // JSON.parse(JSON.stringify(unknown)) возвращает any (отсюда no-unsafe-assignment)
+      // и ронял процесс на undefined; пишем снимок явно, типами.
+      request: {
+        category: input.category,
+        priority: input.priority,
+        responsibleDepartment: input.responsibleDepartment,
+      },
+      response: { errors: [...response.errors], valid: response.valid },
       runId,
     })
   }
