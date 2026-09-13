@@ -68,7 +68,9 @@ export default defineNuxtConfig({
   },
   evlog: {
     env: {
-      environment: process.env.APP_ENV ?? 'development',
+      // environment НЕ задаём: nuxt.config вычисляется в момент сборки, а в Dockerfile
+      // стадия build не получает APP_ENV — на стенде событие врало бы «development».
+      // Эвлог выводит окружение из NODE_ENV рантайма (в образе он production).
       service: 'idea-factory',
     },
     // Паттерн включает НЕ создание логгера (он в Nuxt-интеграции создаётся на любой

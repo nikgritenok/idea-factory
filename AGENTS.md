@@ -205,10 +205,16 @@ Deeper guidance is in the `review-logging-patterns` skill — read it before a l
 - Один запрос = одно широкое событие. Dev: stdout `pnpm dev` в pretty-формате. История:
   `.evlog/logs/<дата>.jsonl` (NDJSON, пишет `server/plugins/evlog-drain.ts`, ротация 7×10 МБ).
 - Навык `analyze-logs` (`.agents/skills/`) читает именно `.evlog/logs/` — пользоваться им, а не
-  изобретать парсер. Полевые проверки: `status`, `durationMs`, `level`, `error.code`, `error.why`,
-  `error.fix`, доменные группы (`idea`, `job`, `doc`, `mvp`).
-- Связать запрос клиента с событием — `requestId` (он же заголовок `X-Request-Id`):
-  `grep <requestId> .evlog/logs/*.jsonl`.
+  изобретать парсер. Поля события: `status`, `durationMs`, `level`, `method`, `path`, `service`,
+  `environment`, доменные группы (`idea`, `job`, `doc`, `mvp`, `filter`) и `error` c
+  `error.message` / `error.stack` / **`error.data.code`**, `error.data.why`, `error.data.fix`
+  (не `error.code` — замерено на прод-артефакте).
+- **Маскирование:** evlog сам redact'ит uuid во событии — и в `path`, и в значениях, включая
+  подставленный в `why` id (`id=****0000-****0000`). Корреляция поэтому только по `requestId`;
+  искать запись по «id из экрана» в логе бесполезно. В HTTP-ответ маскирования нет — там `why`
+  с настоящим id видно (свой id пользователь и так знает).
+- Связать запрос клиента с событием — `requestId` (он же заголовок `X-Request-Id`, его отдаёт
+  `server/middleware/request-id.ts`): `grep <requestId> .evlog/logs/*.jsonl`.
 - В проде `info` сэмплируется 10% — отсутствие события не значит «запроса не было». `warn`/`error`,
   `status >= 400` и `duration >= 1000мс` keep'ятся всегда.
 - `internal` из `createError` попадает в событие, но не в HTTP-ответ: сырую причину драйвера/шага
