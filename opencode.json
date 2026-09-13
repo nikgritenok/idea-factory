@@ -1,53 +1,49 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": [
-    "TZ.md",
-    "DESIGN.md"
-  ],
-  "plugin": [
-    "opencode-tavily"
-  ],
-  "provider": {
+  "instructions": ["TZ.md", "DESIGN.md"],
+  "plugin": ["opencode-tavily"],
+  "providers": {
     "routerai": {
-      "npm": "@ai-sdk/openai-compatible",
       "name": "RouterAI",
-      "options": {
-        "baseURL": "https://routerai.ru/api/v1",
-        "apiKey": "${ROUTERAI_API_KEY}"
+      "canonical": "alibaba",
+      "package": "aisdk:@ai-sdk/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.b.ai/v1",
+        "apiKey": "{file:/Users/nikgretenok/.config/opencode/.routerai-key}"
       },
       "models": {
-        "z-ai/glm-5.3-flash": {
-          "name": "GLM 5.3 Flash (Z.AI)",
-          "limit": {
-            "context": 1048576,
-            "output": 131072
+        "qwen3.8-flash": {
+          "name": "Qwen3.8 Flash (RouterAI)",
+          "family": "qwen",
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image", "video"],
+            "output": ["text"]
           },
-          "options": {
-            "reasoningEffort": "low"
-          }
+          "compatibility": { "reasoningField": "reasoning_content" },
+          "limit": { "context": 1000000, "output": 131072 },
+          "cost": {
+            "input": 0.15,
+            "output": 0.47,
+            "cache": { "read": 0.016, "write": 0.2 }
+          },
+          "variants": [
+            { "id": "low", "settings": { "reasoningEffort": "low" } },
+            { "id": "medium", "settings": { "reasoningEffort": "medium" } },
+            { "id": "xhigh", "settings": { "reasoningEffort": "xhigh" } }
+          ]
         }
       }
     }
   },
+
   "mcp": {
-    "prisma": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "prisma",
-        "mcp"
-      ],
-      "enabled": true
-    },
-    "shadcnVue": {
-      "type": "local",
-      "enabled": true,
-      "command": [
-        "npx",
-        "shadcn-vue@latest",
-        "mcp"
-      ]
+    "servers": {
+      "shadcnVue": {
+        "type": "local",
+        "command": ["npx", "-y", "shadcn-vue@latest", "mcp"],
+        "enabled": true
+      },
     }
   }
 }
