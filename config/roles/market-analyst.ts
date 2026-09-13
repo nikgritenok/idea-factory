@@ -1,5 +1,3 @@
-import type { MarketAnalysis } from '../../shared/schemas/roles/market-analyst'
-
 import { MarketAnalysisSchema } from '../../shared/schemas/roles/market-analyst'
 
 /**
@@ -31,7 +29,7 @@ export const marketAnalystRole = {
 {"marketSize":"строка с оценкой рынка","confidence":"low|medium|high","trends":["тренд 1","тренд 2"],"competitors":[{"name":"имя","description":"описание","strengths":["сила"],"weaknesses":["слабость"]}],"personas":[{"name":"имя","role":"роль","painPoints":["боль"],"goals":["цель"],"objections":["возражение"]}],"segments":[{"name":"сегмент","size":"размер","characteristics":["хар-ка"],"willingnessToPay":"low|medium|high"}],"insights":["вывод 1","вывод 2"]}
 Массивы competitors и personas — минимум 3 элемента, segments — минимум 2.`,
 
-  schema: MarketAnalysisSchema as unknown as MarketAnalysis,
+  schema: MarketAnalysisSchema,
   temperature: 0.2,
   maxTokens: 8192,
   timeoutMs: 300_000,

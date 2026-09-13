@@ -1,5 +1,3 @@
-import type { Strategy } from '../../shared/schemas/roles/strategist'
-
 import { StrategySchema } from '../../shared/schemas/roles/strategist'
 
 /**
@@ -34,7 +32,7 @@ ${market}
 {"scenarios":[{"name":"название","description":"описание","effect":"описание эффекта","probability":0.5,"type":"optimistic","keyFactors":["фактор 1"]}],"recommendedScenario":"имя сценария","experiments":[{"hypothesis":"гипотеза","method":"как проверить","metric":"метрика","successThreshold":"порог успеха","duration":"срок","resources":"ресурсы"}],"experimentPriority":1,"recommendations":["рекомендация 1","рекомендация 2"],"risks":["риск 1"]}
 Массив scenarios — минимум 2 элемента, experiments — минимум 3.`,
 
-  schema: StrategySchema as unknown as Strategy,
+  schema: StrategySchema,
   temperature: 0.2,
   maxTokens: 8192,
   timeoutMs: 300_000,

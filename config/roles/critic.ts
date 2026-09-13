@@ -1,5 +1,3 @@
-import type { CriticReview } from '../../shared/schemas/roles/critic'
-
 import { CriticReviewSchema } from '../../shared/schemas/roles/critic'
 
 /**
@@ -35,7 +33,7 @@ ${analysis}
 {"weaknesses":[{"description":"слабое место","severity":"high","mitigation":"как смягчить"}],"stopFactors":[{"description":"стоп-фактор","reason":"почему","workaround":"обходной путь если есть"}],"overallScore":50,"confidence":"medium","recommendation":"develop","reasoning":"обоснование от 20 символов","nextSteps":["шаг 1"]}
 Массив weaknesses — минимум 2 элемента. stopFactors — пустой массив [], если стоп-факторов нет.`,
 
-  schema: CriticReviewSchema as unknown as CriticReview,
+  schema: CriticReviewSchema,
   temperature: 0.15,
   maxTokens: 8192,
   timeoutMs: 300_000,

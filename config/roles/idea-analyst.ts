@@ -1,5 +1,3 @@
-import type { StructuredIdea } from '../../shared/schemas/roles/idea-analyst'
-
 import { StructuredIdeaSchema } from '../../shared/schemas/roles/idea-analyst'
 
 /**
@@ -35,7 +33,7 @@ export const ideaAnalystRole = {
 Верни СТРОГО JSON ровно в таком формате (без markdown, без пояснений):
 {"title":"краткое название","problem":"какую проблему решает (10-500 симв.)","audience":"кому адресована","value":"какую ценность даёт","constraints":["ограничение 1"],"assumptions":["допущение 1"],"successMetrics":["метрика 1"],"sourceTranscript":"исходный текст без изменений"}`,
 
-  schema: StructuredIdeaSchema as unknown as StructuredIdea,
+  schema: StructuredIdeaSchema,
   temperature: 0.15,
   maxTokens: 3072,
   timeoutMs: 300_000,

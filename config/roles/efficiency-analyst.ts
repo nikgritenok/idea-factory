@@ -1,5 +1,3 @@
-import type { EfficiencyModel } from '../../shared/schemas/roles/efficiency-analyst'
-
 import { EfficiencyModelSchema } from '../../shared/schemas/roles/efficiency-analyst'
 
 /**
@@ -38,7 +36,7 @@ ${baseline}
 5. Рекомендацию
 6. Уверенность в расчёте`,
 
-  schema: EfficiencyModelSchema as unknown as EfficiencyModel,
+  schema: EfficiencyModelSchema,
   temperature: 0.3,
   maxTokens: 8192,
   timeoutMs: 300_000,

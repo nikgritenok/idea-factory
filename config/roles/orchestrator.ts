@@ -1,5 +1,3 @@
-import type { OrchestratorPlan } from '../../shared/schemas/roles/orchestrator'
-
 import { OrchestratorPlanSchema } from '../../shared/schemas/roles/orchestrator'
 
 /**
@@ -31,7 +29,7 @@ export const orchestratorRole = {
 
 ПОМНИ: complexity и priority ТОЛЬКО на английском: "low", "medium", "high". steps — ОБЯЗАТЕЛЬНЫЙ массив строк.`,
 
-  schema: OrchestratorPlanSchema as unknown as OrchestratorPlan,
+  schema: OrchestratorPlanSchema,
   temperature: 0.15,
   maxTokens: 2048,
   timeoutMs: 300_000,
