@@ -40,7 +40,7 @@ function isActive(to: string): boolean {
           v-if="isActive(item.to)"
           layout-id="mobile-nav-pill"
           :transition="{ type: 'spring', stiffness: 420, damping: 34 }"
-          class="absolute inset-0 rounded-full bg-primary-soft"
+          class="absolute inset-1 rounded-full bg-primary-soft"
           aria-hidden="true"
         />
         <Icon

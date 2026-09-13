@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import type { IdeaSummary } from '../ideas/types'
+import type { CardAction } from './card-actions'
 
-import { extractApiMessage, FUNNEL_LABELS, FUNNEL_STAGES, PRIORITY_LABELS } from '../ideas/types'
+import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
+
+import { FUNNEL_LABELS, FUNNEL_STAGES } from '../ideas/types'
+import FunnelCard from './FunnelCard.vue'
+import { useIdeaActions } from './useIdeaActions'
 
 const route = useRoute()
 const isDemo = computed(() => route.query.demo === '1')
@@ -10,7 +24,45 @@ const { error, ideas, pending, refresh } = useIdeas()
 
 const stageFilter = ref<string>('all')
 const archivedIdeas = ref<IdeaSummary[]>([])
+const archivedLoaded = ref(false)
 const loadingArchived = ref(false)
+const archivedError = ref<null | string>(null)
+
+const LIMIT = 10
+
+// API уже отсекает архив, когда stage не запрошен: отдельный фильтр здесь был бы
+// второй реализацией того же числа и врал бы при расхождении.
+const activeCount = computed(() => ideas.value.length)
+const archivedCount = computed(() => archivedIdeas.value.length)
+
+const {
+  archive,
+  busyIdeaId,
+  confirmingArchiveId,
+  flash,
+  jobs,
+  loadJob,
+  remove,
+  restore,
+  resume,
+  run,
+  stop,
+} = useIdeaActions({
+  onArchived: (idea, archived) => {
+    // Счётчик «Архив (N)» намеренно локальный: без этого чип устаревал до следующего
+    // открытия вкладки (watch догружал только при пустом списке).
+    if (archived) {
+      if (!archivedIdeas.value.some(i => i.id === idea.id)) {
+        archivedIdeas.value = [...archivedIdeas.value, idea]
+      }
+    }
+    else {
+      archivedIdeas.value = archivedIdeas.value.filter(i => i.id !== idea.id)
+    }
+  },
+  refresh,
+  reloadArchived: loadArchivedList,
+})
 
 const filtered = computed(() => {
   if (stageFilter.value === 'all') return ideas.value
@@ -18,34 +70,34 @@ const filtered = computed(() => {
   return ideas.value.filter(i => i.funnelStage === stageFilter.value)
 })
 
-const activeCount = computed(() =>
-  ideas.value.filter(i => i.funnelStage !== 'archived').length,
+const stageCounts = computed(() => {
+  const counts: Record<string, number> = { all: ideas.value.length, archived: archivedCount.value }
+  for (const idea of ideas.value) {
+    counts[idea.funnelStage] = (counts[idea.funnelStage] ?? 0) + 1
+  }
+  return counts
+})
+
+/**
+ * Пустые этапы не плодят ряды: полоса прокручивается, непустые — всегда видны.
+ * 'archived' исключён: у него отдельный чип со своим счётчиком (список грузится
+ * отдельно), иначе он рендерился дважды.
+ */
+const visibleStages = computed(() =>
+  FUNNEL_STAGES.filter(s => s !== 'archived' && (stageCounts.value[s] ?? 0) > 0),
 )
 
-const LIMIT = 10
-
-const archivedCount = computed(() => archivedIdeas.value.length)
-
-function stageClasses(stage: string): string {
-  if (stage === 'mvp_ready') return 'bg-success-soft text-success'
-  if (stage === 'decision') return 'bg-accent/20 text-[#7a5200]'
-  if (stage === 'draft') return 'bg-muted text-muted-foreground'
-  if (stage === 'archived') return 'bg-muted text-muted-foreground'
-  return 'bg-primary-soft text-primary'
-}
-
-const runningJobs = ref<Record<string, { status: string, currentStep: null | string }>>({})
-const actionError = ref<null | string>(null)
-const busyIdeaId = ref<null | string>(null)
-
-async function loadArchived(): Promise<void> {
+async function loadArchivedList(): Promise<void> {
   loadingArchived.value = true
+  archivedError.value = null
   try {
     const data = await $fetch<{ ideas: IdeaSummary[] }>('/api/ideas', { query: { stage: 'archived' } })
     archivedIdeas.value = data.ideas
+    archivedLoaded.value = true
   }
   catch {
-    // не критично
+    // Упавший запрос не должен выглядеть как «в архиве пусто» — это читается как потеря данных.
+    archivedError.value = 'Не удалось загрузить архив'
   }
   finally {
     loadingArchived.value = false
@@ -53,65 +105,83 @@ async function loadArchived(): Promise<void> {
 }
 
 watch(stageFilter, (v) => {
-  if (v === 'archived' && archivedIdeas.value.length === 0) {
-    void loadArchived()
+  // Счётчик уже загружен на монтировании; сюда заходим только если та загрузка упала.
+  if (v === 'archived' && !archivedLoaded.value && !loadingArchived.value) {
+    void loadArchivedList()
   }
 })
 
-function priorityClasses(priority: string): string {
-  if (priority === 'high') return 'bg-secondary-soft text-foreground'
-  if (priority === 'low') return 'bg-muted text-muted-foreground'
-  return 'bg-surface-cream text-foreground'
-}
+// Статус прогона живёт 15 секунд: без обновления доска показывает «идёт анализ»
+// по снимку момента загрузки и выглядит зависшей.
+const JOB_POLL_MS = 15_000
+let pollTimer: undefined | ReturnType<typeof setInterval>
 
-async function loadJobStatus(ideaId: string): Promise<void> {
-  try {
-    const data = await $fetch<{ job: { status: string, currentStep: null | string } | null }>(
-      `/api/ideas/${ideaId}/latest-job`,
-    )
-    if (data.job && ['queued', 'running', 'paused', 'failed'].includes(data.job.status)) {
-      runningJobs.value = { ...runningJobs.value, [ideaId]: data.job }
-    }
-  }
-  catch {
-    // нет активной задачи или сбой статуса — индикатор на доске просто не показывается
-  }
-}
-
-async function runAnalysis(idea: IdeaSummary): Promise<void> {
-  busyIdeaId.value = idea.id
-  actionError.value = null
-  try {
-    await $fetch(`/api/ideas/${idea.id}/run`, { method: 'POST' })
-    await loadJobStatus(idea.id)
-    await refresh()
-  }
-  catch (err: unknown) {
-    actionError.value = extractApiMessage(err)
-  }
-  finally {
-    busyIdeaId.value = null
-  }
-}
-
-async function archive(idea: IdeaSummary): Promise<void> {
-  busyIdeaId.value = idea.id
-  actionError.value = null
-  try {
-    await $fetch(`/api/ideas/${idea.id}`, { body: { funnel_stage: 'archived' }, method: 'PATCH' })
-    await refresh()
-  }
-  catch (err: unknown) {
-    actionError.value = extractApiMessage(err)
-  }
-  finally {
-    busyIdeaId.value = null
-  }
+async function refreshAllJobs(): Promise<void> {
+  await Promise.all(ideas.value.map(async (i) => { await loadJob(i.id) }))
 }
 
 onMounted(() => {
-  for (const idea of ideas.value) void loadJobStatus(idea.id)
+  // Чип «Архив» показывается только при непустом счётчике, поэтому архив надо загрузить
+  // сразу: иначе доска, где все идеи убраны, не даёт в них попасть (курица и яйцо).
+  void loadArchivedList()
+  void refreshAllJobs()
+  pollTimer = setInterval(() => void refreshAllJobs(), JOB_POLL_MS)
 })
+onScopeDispose(() => { clearInterval(pollTimer) })
+
+const filterRefs = ref<(null | HTMLElement)[]>([])
+
+/**
+ * Колбэк :ref не аннотируем в шаблоне: `el as HTMLElement | null` парсится
+ * компилятором Vue как фильтр (символ `|`), а не как тип.
+ */
+function setFilterRef(index: number): (el: unknown) => void {
+  return (el) => {
+    filterRefs.value[index] = el instanceof HTMLElement ? el : null
+  }
+}
+
+function moveFilterFocus(from: number, delta: number): void {
+  const count = filterRefs.value.filter(Boolean).length
+  if (count === 0) return
+  const next = (from + delta + count) % count
+  filterRefs.value[next]?.focus()
+}
+
+function onFilterKeydown(event: KeyboardEvent, index: number): void {
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    moveFilterFocus(index, 1)
+  }
+  else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveFilterFocus(index, -1)
+  }
+}
+
+const deleteTarget = ref<null | IdeaSummary>(null)
+const deleteOpen = ref(false)
+
+function askDelete(idea: IdeaSummary): void {
+  deleteTarget.value = idea
+  deleteOpen.value = true
+}
+
+function confirmDelete(): void {
+  const idea = deleteTarget.value
+  deleteOpen.value = false
+  deleteTarget.value = null
+  if (idea) void remove(idea)
+}
+
+function onCardAction(idea: IdeaSummary, action: CardAction): void {
+  if (action === 'run') void run(idea)
+  else if (action === 'stop') void stop(idea)
+  else if (action === 'resume') void resume(idea)
+  else if (action === 'archive') archive(idea)
+  else if (action === 'restore') void restore(idea)
+  else if (action === 'delete') askDelete(idea)
+}
 
 const emptyText = computed(() =>
   stageFilter.value === 'all'
@@ -121,64 +191,80 @@ const emptyText = computed(() =>
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <header class="flex flex-wrap items-end justify-between gap-4">
-      <div class="space-y-1">
-        <h1 class="text-[32px] font-bold leading-tight tracking-[-0.01em] text-primary">
+      <div class="min-w-0">
+        <h1 class="text-headline-lg font-bold leading-tight tracking-[-0.01em] text-primary">
           Список идей
+          <span class="text-body-md font-medium text-muted-foreground">
+            · {{ activeCount }} из {{ LIMIT }}
+          </span>
         </h1>
-        <p class="text-sm text-muted-foreground">
-          Активных идей: {{ activeCount }} из {{ LIMIT }}
-        </p>
       </div>
       <NuxtLink
         to="/"
-        class="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        class="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-label-md font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         + Новая идея
       </NuxtLink>
     </header>
 
-    <div
+    <p
       v-if="activeCount >= LIMIT"
-      class="rounded-xl bg-accent/20 p-4 text-sm"
+      class="rounded-xl bg-accent/20 p-4 text-body-sm"
       role="status"
     >
       Достигнут лимит {{ LIMIT }} активных идей — новые можно добавлять после архивирования.
-    </div>
+    </p>
 
     <div
-      class="flex flex-wrap gap-1.5"
-      role="group"
+      role="radiogroup"
       aria-label="Фильтр по этапу воронки"
+      class="-mx-6 flex gap-1.5 overflow-x-auto px-6 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
     >
       <button
+        :ref="setFilterRef(0)"
         type="button"
-        class="rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        :class="stageFilter === 'all' ? 'bg-foreground text-background' : 'bg-surface text-foreground'"
+        role="radio"
+        :aria-checked="stageFilter === 'all'"
+        :tabindex="stageFilter === 'all' ? 0 : -1"
+        class="shrink-0 rounded-full px-3.5 py-2 text-label-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        :class="stageFilter === 'all' ? 'bg-primary-soft font-bold text-primary' : 'bg-surface text-foreground'"
         @click="stageFilter = 'all'"
+        @keydown="onFilterKeydown($event, 0)"
       >
-        Все ({{ ideas.length }})
+        Все ({{ stageCounts.all ?? 0 }})
       </button>
       <button
-        v-for="stage in FUNNEL_STAGES"
+        v-for="(stage, i) in visibleStages"
         :key="stage"
+        :ref="setFilterRef(i + 1)"
         type="button"
-        class="rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        :class="stageFilter === stage ? 'bg-foreground text-background' : 'bg-surface text-foreground'"
+        role="radio"
+        :aria-checked="stageFilter === stage"
+        :tabindex="stageFilter === stage ? 0 : -1"
+        class="shrink-0 rounded-full px-3.5 py-2 text-label-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        :class="stageFilter === stage ? 'bg-primary-soft font-bold text-primary' : 'bg-surface text-foreground'"
         @click="stageFilter = stage"
+        @keydown="onFilterKeydown($event, i + 1)"
       >
-        {{ FUNNEL_LABELS[stage] }} ({{ stage === 'archived' ? archivedCount : ideas.filter(i => i.funnelStage === stage).length }})
+        {{ FUNNEL_LABELS[stage] }} ({{ stageCounts[stage] ?? 0 }})
+      </button>
+      <button
+        v-if="stageCounts.archived"
+        :ref="setFilterRef(visibleStages.length + 1)"
+        type="button"
+        role="radio"
+        :aria-checked="stageFilter === 'archived'"
+        :tabindex="stageFilter === 'archived' ? 0 : -1"
+        class="shrink-0 rounded-full px-3.5 py-2 text-label-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        :class="stageFilter === 'archived' ? 'bg-primary-soft font-bold text-primary' : 'bg-surface text-foreground'"
+        @click="stageFilter = 'archived'"
+        @keydown="onFilterKeydown($event, visibleStages.length + 1)"
+      >
+        Архив ({{ archivedCount }})
       </button>
     </div>
-
-    <p
-      v-if="actionError"
-      class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
-      role="alert"
-    >
-      {{ actionError }}
-    </p>
 
     <div
       v-if="pending"
@@ -189,7 +275,7 @@ const emptyText = computed(() =>
       <div
         v-for="i in 3"
         :key="i"
-        class="h-24 animate-pulse rounded-2xl bg-surface"
+        class="h-40 animate-pulse rounded-2xl bg-surface"
       />
     </div>
 
@@ -198,13 +284,30 @@ const emptyText = computed(() =>
       class="rounded-xl border bg-card p-6 text-center"
       role="alert"
     >
-      <p class="text-sm text-destructive">
-        Не удалось загрузить идеи: {{ extractApiMessage(error) }}
+      <p class="text-body-sm text-destructive">
+        Не удалось загрузить идеи
       </p>
       <button
         type="button"
-        class="mt-3 text-sm font-medium text-primary underline"
+        class="mt-3 text-body-sm font-medium text-primary underline"
         @click="refresh()"
+      >
+        Повторить
+      </button>
+    </div>
+
+    <div
+      v-else-if="stageFilter === 'archived' && archivedError"
+      class="rounded-xl border bg-card p-6 text-center"
+      role="alert"
+    >
+      <p class="text-body-sm text-destructive">
+        {{ archivedError }}
+      </p>
+      <button
+        type="button"
+        class="mt-3 text-body-sm font-medium text-primary underline"
+        @click="loadArchivedList()"
       >
         Повторить
       </button>
@@ -212,7 +315,8 @@ const emptyText = computed(() =>
 
     <p
       v-else-if="filtered.length === 0"
-      class="rounded-xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground"
+      class="rounded-xl bg-surface p-10 text-center text-body-sm text-muted-foreground"
+      role="status"
     >
       {{ emptyText }}
     </p>
@@ -222,86 +326,64 @@ const emptyText = computed(() =>
       class="space-y-3"
       aria-label="Список идей"
     >
-      <li
+      <FunnelCard
         v-for="idea in filtered"
         :key="idea.id"
-        class="rounded-2xl border bg-card p-5"
-      >
-        <!-- P0: вертикальный стек вместо flex-ряда. Ряд «текст + кнопки в строку»
-             схлопывал колонку заголовка до 10px на 360px (flex-1 с basis 0% против
-             shrink-0 кнопок на 248px): заголовок шёл по слову в строку и залезал
-             под кнопку. Кнопки — равные flex-1 на всю ширину, h-11 (44px тач-цель). -->
-        <div class="space-y-3">
-          <div class="min-w-0 space-y-2">
-            <NuxtLink
-              :to="`/ideas/${idea.id}`"
-              class="text-lg font-bold leading-snug text-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              {{ idea.title }}
-            </NuxtLink>
-            <p
-              v-if="idea.problem"
-              class="line-clamp-2 text-sm leading-6 text-muted-foreground"
-            >
-              {{ idea.problem }}
-            </p>
-            <div class="flex flex-wrap items-center gap-1.5">
-              <span
-                class="rounded-full px-2.5 py-0.5 text-[13px] font-medium"
-                :class="stageClasses(idea.funnelStage)"
-              >
-                {{ FUNNEL_LABELS[idea.funnelStage] ?? idea.funnelStage }}
-              </span>
-              <span
-                class="rounded-full px-2.5 py-0.5 text-[13px] font-medium"
-                :class="priorityClasses(idea.priority)"
-              >
-                {{ PRIORITY_LABELS[idea.priority] ?? idea.priority }}
-              </span>
-              <span
-                v-if="idea.executionStatus === 'running'"
-                class="rounded-full bg-primary-soft px-2.5 py-0.5 text-[13px] font-medium text-primary"
-              >
-                ⏳ {{ runningJobs[idea.id]?.currentStep ? 'шаг: ' + runningJobs[idea.id]?.currentStep : 'выполняется' }}
-              </span>
-              <span
-                v-else-if="idea.executionStatus === 'error'"
-                class="rounded-full bg-destructive/10 px-2.5 py-0.5 text-[13px] font-medium text-destructive"
-              >
-                Ошибка выполнения
-              </span>
-              <span class="text-xs text-muted-foreground">v{{ idea.version }}</span>
-            </div>
-          </div>
-          <div
-            v-if="!isDemo"
-            class="flex gap-2 border-t border-border pt-3"
-          >
-            <button
-              v-if="idea.funnelStage !== 'mvp_ready'"
-              type="button"
-              :disabled="busyIdeaId === idea.id"
-              class="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-secondary px-4 text-sm font-medium text-[#111111] transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              @click="runAnalysis(idea)"
-            >
-              <Icon
-                v-if="busyIdeaId === idea.id"
-                name="lucide:loader-2"
-                class="size-4 animate-spin"
-              />
-              {{ busyIdeaId === idea.id ? 'Запуск…' : 'Запустить анализ' }}
-            </button>
-            <button
-              type="button"
-              :disabled="busyIdeaId === idea.id"
-              class="inline-flex h-11 flex-1 items-center justify-center rounded-full border bg-background px-4 text-sm font-medium transition-colors hover:bg-surface disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              @click="archive(idea)"
-            >
-              В архив
-            </button>
-          </div>
-        </div>
-      </li>
+        :idea="idea"
+        :job="jobs[idea.id] ?? null"
+        :job-known="jobs[idea.id] !== undefined"
+        :busy="busyIdeaId === idea.id"
+        :demo="isDemo"
+        :confirming-archive="confirmingArchiveId === idea.id"
+        @action="(a: CardAction) => onCardAction(idea, a)"
+      />
     </ul>
+
+    <!-- Ошибки и подтверждения — поверх экрана: над списком они уезжали за границу
+         вьюпорта ровно тогда, когда их и нужно увидеть. -->
+    <div
+      v-if="flash"
+      class="fixed inset-x-4 bottom-24 z-40 flex items-center justify-between gap-3 rounded-xl px-4 py-3 shadow-[0_24px_64px_rgba(17,17,17,0.18)]"
+      :class="flash.tone === 'error' ? 'bg-destructive text-on-primary' : 'bg-foreground text-background'"
+      :role="flash.tone === 'error' ? 'alert' : 'status'"
+    >
+      <span class="text-body-sm">{{ flash.text }}</span>
+      <button
+        v-if="flash.action"
+        type="button"
+        class="shrink-0 text-label-sm font-bold underline"
+        @click="flash.action.run()"
+      >
+        {{ flash.action.label }}
+      </button>
+    </div>
+
+    <Dialog v-model:open="deleteOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Удалить идею?</DialogTitle>
+          <DialogDescription>
+            Удаление стирает идею вместе с историей версий, прогонами, отчётами и аудио —
+            восстановить нельзя. Если нужно просто убрать её с доски, используйте архив.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <button
+            type="button"
+            class="inline-flex h-11 items-center justify-center rounded-full border bg-background px-5 text-label-md font-medium transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            @click="deleteTarget = null"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-11 items-center justify-center rounded-full bg-destructive px-5 text-label-md font-medium text-on-primary transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            @click="confirmDelete"
+          >
+            Удалить навсегда
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

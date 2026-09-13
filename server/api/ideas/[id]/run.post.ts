@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
         code: error.statusCode === 404 ? 'IDEA_NOT_FOUND' : 'IDEA_ARCHIVED',
         fix: error.statusCode === 404
           ? 'Обновите доску — идея могла быть удалена, пока карточка была открыта'
-          : 'Снимите идею с архива на доске и повторите запуск',
+          : 'Откройте вкладку «Архив» на доске и верните идею в воронку кнопкой «Вернуть в воронку»',
         message: error.message,
         status: error.statusCode,
         why: 'Очередь не приняла задачу: идея недоступна для запуска',
