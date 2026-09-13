@@ -26,7 +26,7 @@ RUN pnpm run postinstall && \
 FROM base AS migrate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json ./
+COPY package.json prisma.config.ts ./
 COPY src/prisma ./src/prisma
 COPY migrations ./migrations
 CMD ["sh", "-c", "pnpm prisma db update --confirm idea_factory && pnpm prisma db sign"]
