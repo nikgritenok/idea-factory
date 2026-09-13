@@ -88,8 +88,6 @@ export async function compareRuns(
   }
 }
 
-interface RunCallRow { durationMs: null | number, ok: boolean, response: unknown }
-
 /**
  * Получает метрики одного прогона из run_calls.
  */
@@ -99,7 +97,7 @@ async function getRunMetrics(
   const calls = await db.orm.public.RunCalls
     .select('durationMs', 'ok', 'response')
     .where(f => f.runId.eq(runId))
-    .all() as unknown as RunCallRow[]
+    .all()
 
   const totalCalls = calls.length
   const successfulCalls = calls.filter(c => c.ok).length

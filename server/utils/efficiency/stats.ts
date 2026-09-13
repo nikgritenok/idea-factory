@@ -60,7 +60,7 @@ export function bootstrapMeanDiff(
   }
 
   const rng = mulberry32(seed)
-  const diffs: number[] = new Array(resamples)
+  const diffs = new Array<number>(resamples)
 
   for (let i = 0; i < resamples; i++) {
     let sumB = 0
