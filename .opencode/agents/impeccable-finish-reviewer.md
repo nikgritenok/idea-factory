@@ -4,6 +4,8 @@ description: >-
   Порождается из skill `impeccable` (шаг finish review в new-work/craft). Вызывать один раз на готовой поверхности, вне цикла полировки, с пакетом входов: скриншоты вьюпортов, direction contract, approved comp, диффы, findings `impeccable detect`. Без скриншотов возвращает disposition recapture.
 mode: subagent
 steps: 24
+# Вердикт дизайна — не на дешёвом варианте: без model ревьюер наследовал текущую модель сессии.
+model: routerai/qwen3.8-flash#xhigh
 permissions:
   - action: edit
     resource: "*"
