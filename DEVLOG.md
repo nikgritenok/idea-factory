@@ -1,5 +1,36 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-14 / шаг 21] Консоль воркера переведена на evlog `log.*`; найден и подтверждён мёртвый CLI-вход `pnpm worker`
+**Запрос:** остаток задания, шаг E. По Quick Start из доки: `log.info('tag', msg)` ведёт себя как
+`console.log`, поэтому первый коммит — замена без смены поведения; для скриптов/джоб/воркеров —
+не `useLogger`, а общий `log` (+ `initLogger` один раз при старте).
+**Результат:**
+- `server/queue/worker-cli.ts`: `initLogger({ env: { service: 'idea-factory-worker' } })` +
+  `log.info('worker', …)` вместо двух `console.log`; падение старта → `log.error({ event:
+  'worker_boot_failed', error: <stack> })`
+- `server/plugins/worker.ts`: то же для режима `WORKER_MODE=true` (Nitro-плагин, `log` из 'evlog')
+- `server/queue/worker.ts`: `console.error('[worker] persistResults ошибка:', err)` →
+  `log.error({ event: 'persist_results_failed', error: stack })`. Стек сохранён текстом:
+  широкого события с `error.*` вне HTTP-запроса нет, а `log.error(Error)` в сигнатуре есть,
+  но тогда теряется тэг события
+- `console.*` в `server/` не осталось ни в приложении, ни в сервисных модулях; тесты не трогали
+**Найдено проверкой, а не чтением:** `pnpm worker` **не запускается вообще** —
+`ERR_MODULE_NOT_FOUND: Cannot find package '~~' imported from server/utils/schemas.ts`.
+tsx не резолвит алиас Nuxt (в корневом `tsconfig.json` `files: []` и нет `paths`). Замерено на этом
+же дереве без правок шага E (`git stash` трёх файлов) — падает идентично, значит дефект не мой и
+существовал до. Рабочий вход в очередь — Nitro-плагин (`WORKER_MODE=true`, сервис `worker` в
+compose), он и был жив на стенде (шаг 13).
+**Проверка живьём:** `WORKER_MODE=true PORT=3111 pnpm dev` → в логе
+`20:04:40.273 [worker] WORKER_MODE=true — обработчик очереди запущен` — строка выводится evlog'ом
+(таймстемп + тег), а не `console.log`. Процесс остановлен, порт 3111 освобождён, основной dev на
+3000 отвечает 200.
+`pnpm typecheck` → exit 0. `eslint` по трём файлам: 10 ошибок в `worker.ts` — **до правки было тоже
+10** (замер `git stash`), то есть это долг группы `server/queue/**` из шага 20, новых ни одной.
+**Что осталось намеренно:** wide event на каждую обработку задачи (`createLogger` + ручной `emit()`
+в `AnalysisWorker`) — по доке это отдельное проектное решение про жизненный цикл джобы, не «заменить
+консоль»; и починка `pnpm worker` (нужны `paths` в tsconfig для tsx или алиасы в конфиге tsx) —
+это сломанный вход, а не стиль, и чинить его надо отдельным заданием.
+
 ## [2026-09-14 / шаг 20] Чистка ESLint: убран шум, починен projectService; 152 ошибки → 58, warning'ов 0
 **Запрос:** отдельно от задания по evlog — вырезать из `eslint.config.mjs` правила, дающие шум
 (perfectionist целиком, `vue/max-attributes-per-line`, `@stylistic/brace-style`,

@@ -1,4 +1,5 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
+import { log } from 'evlog'
 
 import type { PipelineStep } from '../../config/pipeline'
 import type { CheckpointerHandle } from './checkpointer'
@@ -327,7 +328,11 @@ export class AnalysisWorker {
       }
     }
     catch (err) {
-      console.error('[worker] persistResults ошибка:', err)
+      // Стек сохраняем текстом: воркер вне HTTP-запроса, широкого события с error.* здесь нет
+      log.error({
+        event: 'persist_results_failed',
+        error: err instanceof Error ? err.stack ?? err.message : String(err),
+      })
     }
   }
 

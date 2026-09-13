@@ -1,3 +1,5 @@
+import { log } from 'evlog'
+
 import { PIPELINE_STEPS } from '../../config/pipeline'
 import { createCheckpointer } from '../queue/checkpointer'
 import { AnalysisWorker } from '../queue/worker'
@@ -16,7 +18,7 @@ export default defineNitroPlugin(async () => {
   const worker = new AnalysisWorker(db, { checkpointer: handle, steps: PIPELINE_STEPS })
 
   const shutdown = async (signal: string): Promise<void> => {
-    console.log(`[worker] ${signal}: останавливаюсь после текущей задачи`)
+    log.info('worker', `${signal}: останавливаюсь после текущей задачи`)
     await worker.stop()
     await handle.end()
     process.exit(0)
@@ -24,11 +26,14 @@ export default defineNitroPlugin(async () => {
   process.once('SIGINT', () => void shutdown('SIGINT'))
   process.once('SIGTERM', () => void shutdown('SIGTERM'))
 
-  console.log('[worker] WORKER_MODE=true — обработчик очереди запущен')
+  log.info('worker', 'WORKER_MODE=true — обработчик очереди запущен')
   // eslint-disable-next-line promise/prefer-await-to-then -- fire-and-forget with error logging
-  void worker.start().catch(async (error) => {
-    console.error('[worker] цикл обработки упал:', error)
-    await handle.end()
+  void worker.start().catch((error: unknown) => {
+    log.error({
+      event: 'worker_loop_failed',
+      error: error instanceof Error ? error.stack ?? error.message : String(error),
+    })
+    void handle.end()
     process.exit(1)
   })
 })
