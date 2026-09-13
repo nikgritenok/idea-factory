@@ -15,34 +15,6 @@ const loadError = ref<null | string>(null)
 const actionError = ref<null | string>(null)
 const busy = ref(false)
 
-// MVP state
-const ticketText = ref('')
-const mvpBusy = ref(false)
-const mvpResult = ref<{ classification: unknown, validated: boolean, errors: string[] } | null>(null)
-const mvpError = ref<null | string>(null)
-
-// Agent outputs state
-interface AgentOutput {
-  createdAt: string
-  formatValid: boolean
-  id: string
-  outdated: boolean
-  output: unknown
-  role: string
-  validationError: null | string
-}
-const outputs = ref<AgentOutput[]>([])
-const showOutputs = ref(false)
-const ROLE_LABELS: Record<string, string> = {
-  critic: 'Критик',
-  efficiency_analyst: 'Аналитик эффективности',
-  idea_analyst: 'Аналитик идеи',
-  market_analyst: 'Аналитик рынка',
-  orchestrator: 'Оркестратор',
-  report_editor: 'Редактор отчёта',
-  strategist: 'Стратег',
-}
-
 async function load(): Promise<void> {
   loading.value = true
   loadError.value = null
@@ -53,12 +25,6 @@ async function load(): Promise<void> {
       return
     }
     job.value = await fetchLatestJob(ideaId)
-    // Загружаем логи агентов (не критично если не загрузится)
-    try {
-      const data = await $fetch<{ outputs: AgentOutput[] }>(`/api/ideas/${ideaId}/outputs`)
-      outputs.value = data.outputs
-    }
-    catch { /* ignore */ }
   }
   catch (err: unknown) {
     loadError.value = extractApiMessage(err)
@@ -101,26 +67,6 @@ async function runAnalysis(): Promise<void> {
   }
   finally {
     busy.value = false
-  }
-}
-
-async function submitMvp(): Promise<void> {
-  if (!ticketText.value.trim()) return
-  mvpBusy.value = true
-  mvpError.value = null
-  mvpResult.value = null
-  try {
-    const data = await $fetch<{ classification: unknown, validated: boolean, errors: string[] }>(`/api/ideas/${ideaId}/mvp`, {
-      body: { ticketText: ticketText.value.trim() },
-      method: 'POST',
-    })
-    mvpResult.value = data
-  }
-  catch (err: unknown) {
-    mvpError.value = extractApiMessage(err)
-  }
-  finally {
-    mvpBusy.value = false
   }
 }
 
@@ -206,7 +152,7 @@ onUnmounted(() => {
     <template v-else-if="idea">
       <nav aria-label="Хлебные крошки">
         <NuxtLink
-          to="/"
+          to="/ideas"
           class="text-sm text-muted-foreground hover:text-foreground"
         >← Список идей</NuxtLink>
       </nav>
@@ -334,97 +280,10 @@ onUnmounted(() => {
             </div>
           </section>
 
-          <section
+          <IdeaMvpPanel
             v-if="idea.funnelStage === 'decision' && !isDemo"
-            class="space-y-4 rounded-2xl border border-secondary bg-secondary/5 p-6"
-            aria-labelledby="mvp-heading"
-          >
-            <h2
-              id="mvp-heading"
-              class="text-lg font-bold text-secondary"
-            >
-              MVP: Тест обращения
-            </h2>
-            <p class="text-sm text-muted-foreground">
-              Введите текст обращения клиента — система классифицирует его и проверит правилами.
-            </p>
-            <form
-              class="space-y-3"
-              @submit.prevent="submitMvp"
-            >
-              <textarea
-                v-model="ticketText"
-                class="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                rows="3"
-                placeholder="Здравствуйте, у меня не работает оплата на сайте..."
-                aria-label="Текст обращения клиента"
-              />
-              <button
-                type="submit"
-                :disabled="mvpBusy || !ticketText.trim()"
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-secondary px-5 text-sm font-medium text-on-secondary hover:bg-secondary/90 disabled:opacity-50"
-              >
-                <Icon
-                  v-if="mvpBusy"
-                  name="lucide:loader-2"
-                  class="size-4 animate-spin"
-                />
-                {{ mvpBusy ? 'Обработка...' : 'Проверить обращение' }}
-              </button>
-            </form>
-            <p
-              v-if="mvpError"
-              class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
-              role="alert"
-            >
-              {{ mvpError }}
-            </p>
-            <div
-              v-if="mvpResult"
-              class="space-y-3 rounded-lg border bg-card p-4 text-sm"
-            >
-              <div class="flex items-center gap-2">
-                <Icon
-                  :name="mvpResult.validated ? 'lucide:check-circle-2' : 'lucide:x-circle'"
-                  :class="mvpResult.validated ? 'text-success' : 'text-destructive'"
-                  class="size-5"
-                />
-                <span
-                  :class="mvpResult.validated ? 'bg-success-soft text-success' : 'bg-destructive/10 text-destructive'"
-                  class="rounded-full px-2.5 py-0.5 text-xs font-medium"
-                >
-                  {{ mvpResult.validated ? 'Пройдено' : 'Ошибка валидации' }}
-                </span>
-                <span class="font-medium">Классификация</span>
-              </div>
-              <dl
-                v-if="mvpResult.classification"
-                class="grid gap-1 sm:grid-cols-[140px_1fr]"
-              >
-                <div
-                  v-for="(value, key) in mvpResult.classification as Record<string, unknown>"
-                  :key="key"
-                  class="contents"
-                >
-                  <dt class="text-muted-foreground">
-                    {{ key }}
-                  </dt>
-                  <dd>{{ typeof value === 'string' ? value : JSON.stringify(value) }}</dd>
-                </div>
-              </dl>
-              <ul
-                v-if="mvpResult.errors?.length"
-                class="list-disc pl-5 text-destructive"
-              >
-                <li
-                  v-for="(err, idx) in mvpResult.errors"
-                  :key="idx"
-                >
-                  {{ err }}
-                </li>
-              </ul>
-            </div>
-          </section>
+            :idea-id="ideaId"
+          />
 
           <div class="flex flex-wrap gap-3">
             <NuxtLink
@@ -463,50 +322,7 @@ onUnmounted(() => {
             @run="runAnalysis"
           />
 
-          <section
-            v-if="outputs.length"
-            class="space-y-3 rounded-2xl border bg-card p-6"
-          >
-            <button
-              type="button"
-              class="flex w-full items-center justify-between text-left text-sm font-bold"
-              :aria-expanded="showOutputs"
-              @click="showOutputs = !showOutputs"
-            >
-              <span>Вызовы ИИ-агентов ({{ outputs.length }})</span>
-              <Icon
-                :name="showOutputs ? 'lucide:chevron-up' : 'lucide:chevron-down'"
-                class="size-4 text-muted-foreground"
-              />
-            </button>
-            <ul
-              v-if="showOutputs"
-              class="space-y-2"
-            >
-              <li
-                v-for="out in outputs"
-                :key="out.id"
-                class="rounded-xl bg-surface p-3 text-xs"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-medium">{{ ROLE_LABELS[out.role] ?? out.role }}</span>
-                  <span
-                    class="rounded-full px-2 py-0.5"
-                    :class="out.formatValid ? 'bg-success-soft text-success' : 'bg-destructive/10 text-destructive'"
-                  >
-                    {{ out.formatValid ? 'OK' : 'ошибка формата' }}
-                  </span>
-                  <span
-                    v-if="out.outdated"
-                    class="rounded-full bg-accent/20 px-2 py-0.5"
-                  >устарел</span>
-                </div>
-                <p class="mt-1 text-muted-foreground">
-                  {{ new Date(out.createdAt).toLocaleString('ru-RU', { timeStyle: 'short', dateStyle: 'short' }) }}
-                </p>
-              </li>
-            </ul>
-          </section>
+          <IdeaOutputsPanel :idea-id="ideaId" />
         </aside>
       </div>
     </template>
