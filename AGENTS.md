@@ -27,6 +27,16 @@ It must show at least: one bug-fix cycle and one requirement change done through
 3. After each step — a quick manual check by a human before moving to the next (TZ.md §14).
 4. Commit message references the TZ.md section: `feat(queue): §8 priority queue`.
 5. Husky + lint-staged auto-run `eslint --fix` on staged `*.{ts,vue,mjs}` — write code however is comfortable.
+6. **Branch per task that touches executable code** (`app/ server/ shared/ config/ e2e/`, migrations,
+   `package.json`, lockfile, Dockerfile/compose, build configs): the first command of such a task is
+   `git switch -c <type>/<slug>`, one active branch at a time. Before the first commit, show the output of
+   `git rev-parse --abbrev-ref HEAD` — a printed line, not "we should be on the branch". Docs-only changes
+   (`*.md`, skills, `.opencode/**`) commit straight to `main`.
+7. **Merging into `main` = deploying the public stand = only after an explicit human "yes".** Order:
+   rebase onto `origin/main` → re-run `pnpm lint && pnpm typecheck && pnpm test` (+ `pnpm e2e` on UI),
+   **no worse than the recorded baseline** — the suite is not green on `main` (conventions.md §16) →
+   `git merge --ff-only` → push → delete the branch locally and in origin, its name goes into the DEVLOG
+   line of the task. `--force` on `main` is forbidden. Full list of triggering paths → `docs/conventions.md` §16.
 
 ## Commands (all via pnpm)
 
@@ -42,11 +52,18 @@ pnpm worker                                # Start the queue worker
 
 Публичный стенд: `https://idea-factory.nikgretenok.online` → сервер `193.233.85.147` (проверено DNS + Traefik отвечает на 80/443), панель Dokploy на `:3000`.
 
-Ресурс в Dokploy — **Compose** (не App), источник — GitHub `main`, Compose path — `docker-compose.dokploy.yml`. Ручная работа ограничена одним: push в `main` (дальше авто-деплой по webhook из настроек ресурса).
+Ресурс в Dokploy — **Compose** (не App), источник — GitHub `main`, Compose path — `docker-compose.dokploy.yml`.
+Ручная работа ограничена одним: заданием, смёрженным в `main` и запушенным (п. 6–7 Default workflow).
 
 ```bash
-git push origin main                 # Dokploy пересобирает по webhook
+git push origin main                 # это и есть деплой-акт; отдельной команды «задеплоить» нет
 ```
+
+Как именно панель узнаёт о push — **в панели и проверить**, руками из этого репозитория подтвердить не
+удалось (2026-09-13): webhooks на репозитории ноль (`gh api repos/nikgritenok/idea-factory/hooks` → `[]`),
+а `DOKPLOY_API_KEY` из `.env` панель не принимает (401). Значит «push → авто-деплой по webhook» из шага 13
+до current не доказан: остаётся polling (`watchRepository` на `main`) или кнопка Deploy. До проверки считать,
+что push в `main` только подготавливает релиз, а стенд обновится руками.
 
 Переменные живут в вкладке Environment ресурса, **не** в репозитории. Единственный источник пароля БД —
 `POSTGRES_PASSWORD`; `DATABASE_URL` склеивается из него внутри compose и в Environment его не класть.
