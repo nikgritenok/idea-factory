@@ -38,7 +38,26 @@ pnpm db:migrate | pnpm db:new <name>       # Prisma 8: apply / create migration
 pnpm worker                                # Start the queue worker
 ```
 
-## Deploy to production (VPS — always from this machine!)
+## Deploy to production (Dokploy — основной путь)
+
+Публичный стенд: `https://idea-factory.nikgretenok.online` → сервер `193.233.85.147` (проверено DNS + Traefik отвечает на 80/443), панель Dokploy на `:3000`.
+
+Ресурс в Dokploy — **Compose** (не App), источник — GitHub `main`, Compose path — `docker-compose.dokploy.yml`. Ручная работа ограничена одним: push в `main` (дальше авто-деплой по webhook из настроек ресурса).
+
+```bash
+git push origin main                 # Dokploy пересобирает по webhook
+```
+
+Переменные живут в вкладке Environment ресурса, **не** в репозитории. Единственный источник пароля БД —
+`POSTGRES_PASSWORD`; `DATABASE_URL` склеивается из него внутри compose и в Environment его не класть.
+Локальная грабля, из-за которой этот пункт зафиксирован: в `.env` `POSTGRES_PASSWORD` и пароль внутри
+`DATABASE_URL` различались, приложение молча ходило в несуществующий Postgres.
+
+`docker-compose.dokploy.yml` отличается от prod-файла тремя местами: порты заменены на Traefik-сеть +
+labels, у `migrate` убран `profiles:` и добавлен `service_completed_successfully`, у `db`/`worker`/
+`validator` внешних портов нет. Сервис `migrate` после успешного прогона показан как Exited (0) — норма.
+
+## Deploy на этой машине (запасной путь, без Dokploy)
 
 ```bash
 # NEVER use --no-cache (~5 min reinstall). Default cache rebuilds in ~30s.
@@ -47,7 +66,8 @@ docker compose -f docker-compose.prod.yml build web
 docker compose -f docker-compose.prod.yml up -d web
 ```
 
-The VPS is this machine. Do NOT use SSH to connect elsewhere.
+Это путь для Linux-хоста с репозиторием в `/root/projects` (Dokploy на macOS не ставится). Публичный
+домен на него не смотрит — не путать с основным стендом выше.
 
 ## Stack and structure
 

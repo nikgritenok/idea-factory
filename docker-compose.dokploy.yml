@@ -1,0 +1,110 @@
+# Деплой на Dokploy: https://idea-factory.nikgretenok.online (сервер 193.233.85.147, панель :3000)
+#
+# Чем отличается от docker-compose.prod.yml (тот остаётся путём «на своей машине», см. AGENTS.md):
+#   1. нет `ports:` — наружу ничего не публикуем; домен и Traefik-labels навешиваются средствами
+#      Dokploy (Domains tab / API-поле domains), а не руками в этом файле. Dokploy сам добавит
+#      выбранному сервису сеть `dokploy-network` и подставит правильные entrypoint + certresolver,
+#      поэтому угадывать их имена здесь не нужно
+#   2. у migrate убран `profiles: [setup]` — Dokploy запускает compose без флагов, и с профилем
+#      миграции не выполнились бы вовсе; вместо этого web ждёт service_completed_successfully
+#   3. нет `env_file: .env` — переменные перечислены явно (x-app-env) и интерполируются из .env,
+#      который Dokploy кладёт рядом с compose из вкладки Environment
+#
+# В Environment ресурса (не в репозитории): POSTGRES_PASSWORD — единственный источник пароля,
+# DATABASE_URL склеивается отсюда ниже; ROUTERAI_API_KEY; опционально APP_ENV / LANGSMITH_* / SENTRY_DSN.
+#
+# Проверка файла локально:
+#   POSTGRES_PASSWORD=x ROUTERAI_API_KEY=y docker compose -f docker-compose.dokploy.yml config --quiet
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?set in Environment}@db:5432/${POSTGRES_DB:-idea_factory}
+  ROUTERAI_API_KEY: ${ROUTERAI_API_KEY:?set in Environment}
+  APP_ENV: ${APP_ENV:-production}
+  LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+  LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+  LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-idea-factory}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in Environment}
+      POSTGRES_DB: ${POSTGRES_DB:-idea_factory}
+    volumes:
+      # именованный том, не bind-mount: только так работает Dokploy Volume Backups
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # one-shot: поднимает схему и подпись миграций, завершается кодом 0.
+  # В UI Dokploy сервис будет показан как Exited (0) — это ожидаемое состояние, не ошибка.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?set in Environment}@db:5432/${POSTGRES_DB:-idea_factory}
+      POSTGRES_DB: ${POSTGRES_DB:-idea_factory}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      target: runtime
+    environment:
+      <<: *app-env
+      WORKER_MODE: "false"
+      NITRO_PORT: "3000"
+      VALIDATOR_URL: "http://validator:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      validator:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
+    # домен: idea-factory.nikgretenok.online → этот сервис, порт 3000, HTTPS + Let's Encrypt.
+    # Задаётся один раз в Dokploy (Domains) — см. шапку файла, почему не labels здесь.
+
+  # Тот же образ, что web, но WORKER_MODE=true: server/plugins/worker.ts поднимает обработчик
+  # очереди внутри Nitro. Держим отдельным сервисом сознательно: деплой web не рвёт текущие
+  # прогоны, и логи конвейера видны отдельно от HTTP-логов.
+  worker:
+    build:
+      context: .
+      target: runtime
+    environment:
+      <<: *app-env
+      WORKER_MODE: "true"
+      VALIDATOR_URL: "http://validator:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      validator:
+        condition: service_started
+    restart: unless-stopped
+    # конвейер на идею — до 2.5 мин; при остановке ждём завершения текущей задачи
+    stop_grace_period: 300s
+
+  validator:
+    build:
+      context: ./services/validator
+    restart: unless-stopped
+
+volumes:
+  db_data:
