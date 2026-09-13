@@ -37,7 +37,6 @@
     "@lucide/vue": "^1.42.0",
     "@nuxt/icon": "^2.5.1",
     "@prisma/orm-postgres": "8.0.0-rc.8",
-    "@sentry/nuxt": "^10.73.0",
     "@vueuse/core": "^14.4.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -11,7 +11,7 @@
 #      который Dokploy кладёт рядом с compose из вкладки Environment
 #
 # В Environment ресурса (не в репозитории): POSTGRES_PASSWORD — единственный источник пароля,
-# DATABASE_URL склеивается отсюда ниже; ROUTERAI_API_KEY; опционально APP_ENV / LANGSMITH_* / SENTRY_DSN.
+# DATABASE_URL склеивается отсюда ниже; ROUTERAI_API_KEY; опционально APP_ENV / LANGSMITH_*.
 #
 # Проверка файла локально:
 #   POSTGRES_PASSWORD=x ROUTERAI_API_KEY=y docker compose -f docker-compose.dokploy.yml config --quiet
@@ -23,7 +23,6 @@ x-app-env: &app-env
   LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
   LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
   LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-idea-factory}
-  SENTRY_DSN: ${SENTRY_DSN:-}
 
 services:
   db:

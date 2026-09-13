@@ -71,7 +71,6 @@ cp .env.example .env
 | `POSTGRES_DB` | Да | Имя базы данных |
 | `DATABASE_URL` | Да | URL подключения к БД |
 | `ROUTERAI_API_KEY` | Да | API-ключ для LLM |
-| `SENTRY_DSN` | Нет | DSN для Sentry |
 | `LANGSMITH_API_KEY` | Нет | API-ключ LangSmith |
 | `APP_ENV` | Нет | `production` или `development` |
 

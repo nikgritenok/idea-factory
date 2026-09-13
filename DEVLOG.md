@@ -1,5 +1,36 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-14 / шаг 16] Sentry удалён полностью, наблюдаемость остаётся на evlog
+**Запрос:** «удали Sentry полностью и поставь вместо него evlog по официальной доке, добавь в nuxt.config,
+и во всех server/api роутах используй useLogger + createError из evlog с полями why и fix».
+**План:** этот шаг — только удаление Sentry (коммит A). Evlog уже стоит (`evlog@2.28.1`, модуль в `modules`),
+его доводкой до доки, fs-drain, роутами и клиентом — шаги 17–20 этого же задания.
+**Результат:**
+- удалены `sentry.client.config.ts`, `sentry.server.config.ts`, `@sentry/nuxt` из `package.json`
+- `pnpm-lock.yaml`: −534 строки, ушли и транзитивные (`@nuxt/kit@3.21.11`, opentelemetry, replay, bundler-plugins);
+  `grep -ci sentry pnpm-lock.yaml` → 0, из `node_modules` выбрано 34 пакета
+- `nuxt.config.ts`: модуль + `runtimeConfig.sentryDsn` и `public.sentryDsn` (оба читались только из удаляемых конфигов)
+- `pnpm-workspace.yaml` (`allowBuilds: '@sentry/cli'`), `.env.example` (`SENTRY_DSN`),
+  `docker-compose.dokploy.yml` (строка env + упоминание в шапке), `README.md` (таблица переменных),
+  `docs/ARCHITECTURE.md` (стек, структура, схема наблюдаемости, безопасность, таблица зависимостей)
+- `DEVLOG.md` — исторические строки шага 7 не переписаны: журнал показывает, что Sentry был, а не чего в нём
+  испугались
+**Проверка:** `pnpm typecheck` → exit 0, 0× `error TS`; `pnpm lint` → **112 errors / 5 warnings**, идентично
+baseline этого же дерева (замерен до первой правки); `pnpm exec nuxt prepare` → типы собраны;
+`pnpm dlx @evlog/cli map --no-write` → **31/100, 21 из 21 API-хендлеров с пробелами** — отправная точка
+для шага 18. Чужих `sentry`-упоминаний в коде не осталось (ripgrep по *.ts/*.vue/*.mjs/*.json/*.yml/*.md —
+только DEVLOG-история).
+**Фиксы (два цикла, оба через агент):**
+1. `pnpm remove @sentry/nuxt` виснет 5 минут без вывода. Причина — `postinstall` (`nuxt prepare && prisma skills sync`)
+   на живом dev-сервере. Обход: правка `package.json` вручную + `pnpm install --lockfile-only --ignore-scripts`
+   (1м10с) + `pnpm install --ignore-scripts` (15с). Правило «pnpm only» не нарушено: обошёл скрипт, не пакетный менеджер.
+2. В working tree параллельной сессией велась чужая незакоммиченная правка (`eslint.config.mjs`,
+   `scripts/ui-detect.mjs`, строка `ui:detect` в `package.json`). Моя команда `git switch -c` переключила общий
+   HEAD посреди её работы. По решению владельца чужие правки в этот коммит не взяты: строка `ui:detect`
+   временно снята в патч и возвращена в дерево, `eslint.config.mjs` и `scripts/ui-detect.mjs` не стейджились.
+   **Смена требования, проведённая через агента:** из hard-правила §7 «один активной ветки за раз» следует,
+   что параллельные сессии обязаны расходиться по worktree — зафиксировано в шаге 20.
+
 ## [2026-09-13 / шаг 15] Источник стенда привязан к GitHub App; автодеплой проверяется этим коммитом
 **Запрос:** «сначала разберёмся с автодеплоем».
 **План:** причина нулевых webhook'ов на репозитории не в ключе (гипотеза шага 13 и поправка шага 14

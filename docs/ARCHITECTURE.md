@@ -18,7 +18,7 @@
 | Pre-commit | husky + lint-staged | Автоформатирование и проверка перед коммитом |
 | Unit Testing | Vitest | Unit-тесты, интеграционные тесты |
 | E2E Testing | Playwright | End-to-end тесты + CLI для AI-агента |
-| Error Monitoring | Sentry (@sentry/nuxt) | Ошибки, stack trace, release tracking |
+| Error Monitoring | evlog | Структурированные ошибки: `message` + `why` + `fix` + `code`, уходят и в HTTP-ответ, и в wide event |
 | Structured Logging | evlog | Один широкий event на запрос, structured JSON |
 | Runtime | Node.js (LTS) | Серверный рантайм |
 | Language Runtime | tsx | Запуск .ts файлов (CLI worker, миграции) |
@@ -73,8 +73,6 @@ docs/                 # Документация
 services/             # Микросервисы (изолированные контейнеры)
   validator/          # Валидатор правил (node:http, POST /validate, GET /version)
 
-sentry.client.config.ts  # Sentry client-side init
-sentry.server.config.ts  # Sentry server-side init
 playwright.config.ts     # Playwright конфиг (Chromium, webServer)
 ```
 
@@ -93,15 +91,12 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 ### Наблюдаемость (Observability)
 
 ```
-Запрос → evlog (один широкий event) → stdout (JSON)
-              ↓
-         Sentry (ошибки + stack trace)
+Запрос → evlog (один широкий event) → stdout (JSON в prod, pretty в dev)
               ↓
          X-Request-Id header (генерируется evlog)
 ```
 
 - **evlog**: один event на каждый API-запрос со всем контекстом (user, idea, step, duration). Конфиг: `evlog/nuxt` модуль, `include: ['/api/**']`
-- **Sentry**: автоматическая инструментация client + server через `@sentry/nuxt/module`. DSN через `runtimeConfig`. Source maps заливаются через Vite plugin
 - **Playwright**: E2E-тесты в `e2e/`, Chromium-only. `webServer` автоматически поднимает `pnpm dev`. CLI (`@playwright/cli`) для AI-агента
 
 ### Очередь и воркер (TZ §8)
@@ -260,7 +255,6 @@ curl https://idea-factory.nikgretenok.online/api/health
 
 - **DATABASE_URL**: только через переменные окружения, не хранится в коде
 - **API ключи** (routerai.ru): только на сервере, через `NITRO_*` env vars
-- **SENTRY_DSN**: через `runtimeConfig`, не хардкод
 - **Prompt injection**: текст идеи — данные, а не инструкции (защита на уровне промптов)
 - **Файлы аудио**: загружаются на сервер, хранятся временно, удаляются после обработки
 - **Pre-commit hooks**: husky + lint-staged запускают `eslint --fix` на каждом коммите
@@ -300,8 +294,7 @@ pnpm worker                 # Запустить воркер
 | `@langchain/langgraph-checkpoint-postgres` | 1.0.5 | Checkpointing в Postgres |
 | `postgres` | 3.4.9 | SQL-first Postgres driver |
 | `pg` | 8.23.0 | node-postgres (только для LangGraph checkpointer) |
-| `@sentry/nuxt` | 10.73.0 | Error monitoring (Sentry) |
-| `evlog` | 2.28.1 | Structured logging (wide events) |
+| `evlog` | 2.28.1 | Structured logging (wide events) + структурированные ошибки |
 | `zod` | 4.5.4 | Валидация данных |
 | `tsx` | 4.23.13 | TS execution (CLI, worker) |
 | `vitest` | 3.2.7 | Unit + integration тесты |

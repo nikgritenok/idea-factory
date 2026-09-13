@@ -2,7 +2,7 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', '@sentry/nuxt/module', 'evlog/nuxt', '@nuxt/icon', 'motion-v/nuxt'],
+  modules: ['@nuxt/eslint', 'evlog/nuxt', '@nuxt/icon', 'motion-v/nuxt'],
   devtools: { enabled: true },
   app: {
     head: {
@@ -35,12 +35,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // server-only
     openaiApiKey: '',
-    sentryDsn: '',
     // public
     public: {
       appName: 'Фабрика идей',
       appEnv: process.env.APP_ENV ?? 'development',
-      sentryDsn: '',
     },
   },
   compatibilityDate: '2025-07-15',
