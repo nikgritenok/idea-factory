@@ -9,8 +9,10 @@ import { parseUuid } from '../../../utils/schemas'
 //
 // Широкое событие этого запроса эмитится на ЗАКРЫТИИ потока: SSE держит соединение
 // открытым, поэтому в логе оно появится одной строкой за всю жизнь подписки, с итоговой
-// durationMs. Логгер после emit запечатан (в Nuxt-интеграции нет log.fork), так что
-// log.set() внутри setInterval ниже — не писать: значения молча потеряются с warning'ом.
+// durationMs. Пока поток открыт, логгер жив — log.error/log.info внутри опроса ниже
+// допустимы (и пишутся не чаще перехода состояния, чтобы не затопить лог каждые 2 сек).
+// После закрытия логгер запечатан (в Nuxt-интеграции нет log.fork) — любое set() там
+// молча потеряется с warning'ом, поэтому cleanup() ничего не логирует.
 export default defineEventHandler((event) => {
   const log = useLogger(event)
   const jobId = parseUuid(getRouterParam(event, 'id'))
@@ -28,6 +30,7 @@ export default defineEventHandler((event) => {
   let lastStep: null | string = null
   let lastStatus: null | string = null
   let closed = false
+  let pollFailures = 0
 
   function send(data: Record<string, unknown>): void {
     if (closed) return
@@ -57,13 +60,25 @@ export default defineEventHandler((event) => {
           send({ currentStep, error, status, type: 'progress' })
         }
 
+        if (pollFailures > 0) {
+          // Опрос спотыкался, но достал до БД. Отдельную строку в лог не пишем: событие
+          // этого запроса ещё не эмитировано, достаточно поля в нём же.
+          log.set({ stream: { pollFailures, recovered: true } })
+          pollFailures = 0
+        }
+
         if (['cancelled', 'done', 'failed'].includes(status)) {
           send({ status, type: 'done' })
           cleanup()
         }
       }
-      catch {
-        // DB error — повторим через 2 сек
+      catch (err) {
+        // Поток ещё открыт → событие не эмитено, логгер жив: писать можно. Но один раз на
+        // переход в аврал, а не каждые 2 секунды — иначе цикл затопит лог.
+        pollFailures++
+        if (pollFailures === 1) {
+          log.error(err instanceof Error ? err : new Error(String(err)), { step: 'stream-poll' })
+        }
       }
     })()
   }, 2000)

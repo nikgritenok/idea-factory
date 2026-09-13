@@ -37,6 +37,11 @@ It must show at least: one bug-fix cycle and one requirement change done through
    **no worse than the recorded baseline** — the suite is not green on `main` (conventions.md §16) →
    `git merge --ff-only` → push → delete the branch locally and in origin, its name goes into the DEVLOG
    line of the task. `--force` on `main` is forbidden. Full list of triggering paths → `docs/conventions.md` §16.
+8. **Шаг считается проверенным, когда показано широкое событие этого шага**, а не только зелёный
+   exit code: строка из stdout `pnpm dev` или `requestId` из `.evlog/logs/<дата>.jsonl` (где смотреть —
+   раздел «Отладка» ниже). Для серверного кода без HTTP-входа — соответствующая запись того же `log`.
+   Это реализация hard-правила «never pass generated output as verified»: «должно работать» аргументом
+   не считается.
 
 ## Commands (all via pnpm)
 
@@ -191,6 +196,38 @@ in production, but it is a safety net — not a substitute for choosing the fiel
 Check coverage with `npx @evlog/cli map --no-write`. Diagnose setup with `npx @evlog/cli doctor`.
 Deeper guidance is in the `review-logging-patterns` skill — read it before a logging change.
 <!-- evlog:end -->
+
+## Отладка: где смотреть (вне блока evlog — его перезаписывает `@evlog/cli`)
+
+Правило выше описывает, как логи **писать**. Это — как читать, когда что-то сломалось. Молча
+ставить `console.log` и гадать по терминалу считается неверной отладкой: событие уже есть.
+
+- Один запрос = одно широкое событие. Dev: stdout `pnpm dev` в pretty-формате. История:
+  `.evlog/logs/<дата>.jsonl` (NDJSON, пишет `server/plugins/evlog-drain.ts`, ротация 7×10 МБ).
+- Навык `analyze-logs` (`.agents/skills/`) читает именно `.evlog/logs/` — пользоваться им, а не
+  изобретать парсер. Полевые проверки: `status`, `durationMs`, `level`, `error.code`, `error.why`,
+  `error.fix`, доменные группы (`idea`, `job`, `doc`, `mvp`).
+- Связать запрос клиента с событием — `requestId` (он же заголовок `X-Request-Id`):
+  `grep <requestId> .evlog/logs/*.jsonl`.
+- В проде `info` сэмплируется 10% — отсутствие события не значит «запроса не было». `warn`/`error`,
+  `status >= 400` и `duration >= 1000мс` keep'ятся всегда.
+- `internal` из `createError` попадает в событие, но не в HTTP-ответ: сырую причину драйвера/шага
+  искать в логе, а не требовать от клиента.
+- Покрытие логированием смотреть через `pnpm dlx @evlog/cli map` (в зависимости не добавлять);
+  диагностика установки — `pnpm dlx @evlog/cli doctor`.
+
+## Parallel сессии: один checkout — одна активная ветка
+
+Практика 2026-09-14: две сессии вели работу в одном working tree. Первая держала незакоммиченную
+правку (`eslint.config.mjs`, новый `scripts/*.ts`), вторая создала свою ветку — `git switch -c`
+переключил общий HEAD посреди чужой работы, а `pnpm install` одной сессии ломает dev-сервер другой;
+плюс `pnpm test` обеих бьёт в одну тестовую БД на 5434.
+
+Прежде чем branches пересеклись: `git worktree add ../<repo>-<task> -b <type>/<slug>` и работать
+отдельно (`pnpm install --ignore-scripts`, свой порт dev). Если второй checkout невозможен —
+дождаться коммита/отката чужой правки. Правило стейджинга: перед `git add -A` обязателен `git status`
+в том же шаге, и если в дереве есть хоть один чужой файл — `git add` только своих путей. Чужую
+незакоммиченную работу не коммитить в свою историю и не откатывать без явного решения человека.
 
 ## Prisma 8 — database access (MCP + rules)
 

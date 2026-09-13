@@ -195,7 +195,10 @@ export default defineEventHandler(async (event) => {
 
 - Never log secrets (tokens, keys, passwords, personal data).
 - Validate/sanitize all external inputs: paths, URLs, user data (Zod at boundaries).
-- No `console.log` in production code.
+- No `console.log` in production code. В `server/` логирование только через evlog: в HTTP-роутах
+  `useLogger(event)` + `log.set()` (одно широкое событие на запрос), вне запроса — `log.info/error`.
+  Пользовательский текст (транскрипт, текст обращения, аудио) в событие не кладётся — идентификаторы
+  и размеры.
 
 ## 10. Testing (Vitest)
 
@@ -369,14 +372,24 @@ nuxt.config.ts  prisma.config.ts  vitest.config.ts  playwright.config.ts  eslint
 
 ### Baseline, а не «зелёный»
 
-Гейт сформулирован как «не хуже baseline», потому что на `main` прогон сейчас не зелёный (измерено
-2026-09-13 на `c8b7337`, до этого задания):
+Гейт сформулирован как «не хуже baseline», потому что прогон не зелёный и не будет зелёным молча.
+Замерялось дважды, и оба числа нужны:
 
-| Команда | Факт |
-| --- | --- |
-| `pnpm lint` | 157 errors / 5 warnings, exit 1 |
-| `pnpm typecheck` | exit 0 (шум — `NUXT_B3011` WARN про дубли имён `Ui*` и дублированный импорт `IDEA_LIMIT_ACTIVE`, это не `error TS`) |
-| `pnpm test` | 6 failed / 52 passed; падают `server/`-тесты, требующие `ROUTERAI_API_KEY` («LLM-ключ не настроен на сервере») |
+| Команда | `main` на 2026-09-13 (`c8b7337`) | ветка `chore/replace-sentry-with-evlog` на 2026-09-14 |
+| --- | --- | --- |
+| `pnpm lint` | 157 errors / 5 warnings, exit 1 | **37 errors / 0 warnings**, exit 1 |
+| `pnpm typecheck` | exit 0 (шум — `NUXT_B3011` WARN про дубли имён `Ui*` и дублированный импорт `IDEA_LIMIT_ACTIVE`, это не `error TS`) | exit 0, тот же шум |
+| `pnpm test` | 6 failed / 52 passed | 6 failed / **60 passed** (добавлено 8 тестов, падать стало не больше) |
+
+Правая колонка — прогон на этой ветке после шагов 16–21, до мёрджа; после `--ff-only` её обязано
+переснять на `main` и оставить единственной. Разрыв 157 → 37 — не «стало чисто»: вычищен шум
+(`perfectionist`,Formatting- и `sonarjs/prefer-*`-правила, `security/detect-non-literal-*`) и один
+класс ложных срабатываний из-за неверной настройки `projectService` (DEVLOG шаги 19–20).
+
+Остаток 37 — долг, а не чистота: 36 ошибок в `server/queue/**` (в основном `as unknown as JobRow` на
+строках Prisma и `any` в jsonb протокола прогона) плюс `max-lines` в `IdeaCard.vue`. Правки там меняют
+типы данных очереди, а `queue.test.ts`/`worker.test.ts` красные и до, и после (нужен `ROUTERAI_API_KEY`),
+то есть проверить «не сломал воркер» на зелёном сейчас нельзя — оставлено с разбивкой в DEVLOG шаг 20.
 
 Значит мёрдж не добавляет ни одного нового падения и ни нового lint-error; починенное отмечается в DEVLOG
 и двигает baseline вниз. Когда строка перестанет совпадать с реальностью — обновить её прогоном на `main`,

@@ -46,14 +46,15 @@ server/               # Backend (Nitro)
     ideas/            # CRUD идей + запуск анализа
     jobs/             # Управление задачами очереди
   utils/
-    api/              # API helpers (error.ts — единый apiError)
     db.ts             # Синглтон postgres.js
     ideas.ts          # Хелперы для ideas, лимит 10 активных
     llm.ts            # LLM-клиент (z-ai/glm-5.3-flash через routerai.ru)
     stt.ts            # STT через routerai.ru
+    validator-client.ts # Клиент микросервиса-валидатора
+    api-errors.test.ts  # Страж конвенции ошибок (code/why/fix в каждом createError)
   queue/              # Очередь задач + LangGraph-воркер
     llm-executor.ts   # LLM-исполнитель (вызов LLM + Zod-валидация)
-  plugins/            # Nitro-плагины (db-migrate, worker)
+  plugins/            # Nitro-плагины (evlog-drain — запись wide events в .evlog/logs, worker)
 
 shared/               # Общий код (app/ + server/)
   schemas/            # Zod schemas — единый источник правды
@@ -91,12 +92,20 @@ UI (app/) → API (Nitro routes) → Postgres (карточки, версии, �
 ### Наблюдаемость (Observability)
 
 ```
-Запрос → evlog (один широкий event) → stdout (JSON в prod, pretty в dev)
+Запрос → evlog (один широкий event) → stdout (pretty в dev, JSON в prod; собирает Dokploy)
+              │                      → .evlog/logs/<дата>.jsonl (fs-drain, 7 файлов × 10 МБ)
               ↓
          X-Request-Id header (генерируется evlog)
 ```
 
-- **evlog**: один event на каждый API-запрос со всем контекстом (user, idea, step, duration). Конфиг: `evlog/nuxt` модуль, `include: ['/api/**']`
+- **evlog**: один event на каждый запрос со всем контекстом (`idea.id`, `job.status`, `doc.name`,
+  `durationMs`, `status`). Конфиг: `evlog/nuxt` + `server/plugins/evlog-drain.ts`;
+  `include: ['/api/**', '/docs/**']` — логгер создаётся на любом запросе, `include` решает, эмитить ли
+  событие. В проде `info` сэмплируется 10%, но `status >= 400` и `duration >= 1000мс` force-keep'ятся,
+  `warn`/`error` пишутся всегда
+- **Структурированные ошибки**: `createError({ code, message, status, why, fix, internal? })` из `evlog`
+  во всех 21 роуте. Клиент получает `{ status, message, data: { code, why, fix } }` и читает через
+  `parseError`; `internal` (причины драйверов, ответы шагов) в HTTP-тело не попадает, остаётся в событии
 - **Playwright**: E2E-тесты в `e2e/`, Chromium-only. `webServer` автоматически поднимает `pnpm dev`. CLI (`@playwright/cli`) для AI-агента
 
 ### Очередь и воркер (TZ §8)
