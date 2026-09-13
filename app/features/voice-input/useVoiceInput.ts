@@ -1,3 +1,5 @@
+import { extractApiMessage } from '../ideas/types'
+
 export interface TranscribeResult {
   code?: 'empty_transcript'
   error?: { code: string, message: string }
@@ -80,8 +82,7 @@ export function useVoiceInput() {
       return result.text ?? null
     }
     catch (err) {
-      const e = err as { data?: { message?: string, statusMessage?: string }, message?: string }
-      error.value = e.data?.message ?? e.data?.statusMessage ?? e.message ?? 'Ошибка расшифровки'
+      error.value = extractApiMessage(err, 'Ошибка расшифровки')
       return null
     }
     finally {

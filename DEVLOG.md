@@ -1,5 +1,30 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-14 / шаг 19] Клиент читает ошибки через `parseError`; починен user-visible дефект текста ошибки
+**Запрос:** продолжение задания, согласованное решение «да, правим фронт под evlog».
+**Результат:**
+- `extractApiMessage` в `app/features/ideas/types.ts` переписана на `parseError` из evlog;
+  мёртвый `interface ApiErrorShape` (описание envelope, которого сервер не отдаёт) удалён;
+  добавлен необязательный `fallback`, чтобы формы не теряли свои формулировки
+- `CreateIdeaForm.vue` и `useVoiceInput.ts` перестали дублировать разбор ошибки локальными кастами —
+  обе точки идут через `extractApiMessage`; `IdeaCard.vue` и `FunnelBoard.vue` (7 вызовов) правки не требуют
+- тесты: `app/features/ideas/types.test.ts` (4 теста: evlog-ответ, живой `EvlogError`, старый h3-вид,
+  пустая ошибка) и `server/utils/api-errors.test.ts` (страж правила: каждый `createError` в роутах несёт
+  `code`/`status`/`why`/`fix`, импортирован из `evlog`, и нигде не осталось `statusMessage`)
+**Проверка (измерено, не «должно работать»):** прогон через `ofetch` против живого dev-сервера на
+`GET /api/ideas/00000000-…` (404):
+- старая формула `e.data?.error?.message ?? e.message` → `[GET] "http://localhost:3000/api/ideas/00000000-0000-0000-0000-000000000000": 404  `
+  — то есть в интерфейсе показывался сырой текст ofetch с полным URL и uuid;
+- `parseError(e)` → `message: «Идея не найдена»`, `code: IDEA_NOT_FOUND`, `fix: «Вернитесь на доску и откройте
+  существующую идею — ссылка могла устареть»`.
+`pnpm exec vitest run` по двум файлам → 8/8 зелёные; полный прогон: **6 failed / 60 passed** против baseline
+**6 failed / 52 passed** — те же 5 падающих файлов (LLM-ключ и тестовая БД), новых падений 0, +8 green.
+Type-aware ESLint по изменённым файлам — чисто.
+**Фиксы цикла проверки:** (1) страж сначала требовал `code:` и упал на законном шортхенде `code,`
+(его сам же предписывает `object-shorthand`) — распознавание переведено на оба варианта;
+(2) `parseError(undefined)` возвращает строку `"undefined"` — в `extractApiMessage` добавлена явная
+проверка на null/undefined, иначе в UI так и печаталось бы.
+
 ## [2026-09-14 / шаг 18] 21 роут на `useLogger` + `createError` из evlog; мёртвый `apiError` удалён
 **Запрос:** «во всех server/api роутах используй useLogger + createError из evlog с полями why и fix».
 **Найденный попутно дефект:** `server/utils/api/error.ts` с `apiError()` не вызывался **ни из одного** роута —
@@ -53,6 +78,7 @@
 `parseUuid` → 500 «Internal Server Error» вместо 400. Чинится в одном месте (`shared/schemas`), но это
 смена публичного типа ошибки — требует решения человека.
 
+## [2026-09-14 / шаг 17] Evlog доведён до доки: fs-drain с ротацией, `/docs/**` в include, сэмплинг в проде
 **Запрос:** то же задание, пункт «поставь evlog по официальной доке, добавь в nuxt.config».
 **План:** модуль и блок `evlog` в конфиге уже были; не хватало двух — события никуда кроме stdout не
 писались (drain не зарегистрирован, а навык `analyze-logs` из `.agents/skills/` адресует `.evlog/logs/`),

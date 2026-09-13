@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Priority } from '~~/shared/schemas'
+import { extractApiMessage } from '../ideas/types'
 import { useVoiceInput } from '../voice-input/useVoiceInput'
 
 const transcript = ref('')
@@ -51,8 +52,7 @@ async function handleSubmit(): Promise<void> {
     await navigateTo(`/ideas/${res.idea.id}`)
   }
   catch (err: unknown) {
-    const e = err as { data?: { error?: { message?: string } }, message?: string }
-    submitError.value = e.data?.error?.message ?? e.message ?? 'Не удалось сохранить идею'
+    submitError.value = extractApiMessage(err, 'Не удалось сохранить идею')
   }
   finally {
     submitting.value = false

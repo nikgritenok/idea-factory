@@ -1,5 +1,7 @@
 import type { FunnelStage, Priority } from '~~/shared/schemas'
 
+import { parseError } from 'evlog'
+
 export interface IdeaSummary {
   assumptions: null | Record<string, unknown>
   audience: null | string
@@ -38,18 +40,21 @@ export interface JobSummary {
   status: string
 }
 
-export interface ApiErrorShape {
-  error: {
-    code: string
-    message: string
-    details?: unknown
+/**
+ * Извлекает человекочитаемое сообщение из ошибки API.
+ *
+ * Читает ответ evlog (`{ status, message, data: { code, why, fix } }`) через parseError —
+ * он же покрывает и старый вид h3-ответа (`statusMessage`), и случай, когда $fetch уже
+ * развернул тело в `err.data`. Раньше функция смотрела только в `data.error.message`,
+ * чего в ответах не было, и всегда возвращала заглушку из `err.message`.
+ */
+export function extractApiMessage(err: unknown, fallback = 'Неизвестная ошибка'): string {
+  // parseError на null/undefined даёт строку "undefined" — её показывать нельзя
+  if (err === null || err === undefined) {
+    return fallback
   }
-}
 
-/** Извлекает человекочитаемое сообщение из API-error envelope или сырой ошибки */
-export function extractApiMessage(err: unknown): string {
-  const maybe = err as { data?: ApiErrorShape, message?: string }
-  return maybe.data?.error.message ?? maybe.message ?? 'Неизвестная ошибка'
+  return parseError(err).message || fallback
 }
 
 export const FUNNEL_STAGES: readonly FunnelStage[] = [
