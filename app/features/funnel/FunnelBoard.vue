@@ -225,10 +225,14 @@ const emptyText = computed(() =>
       <li
         v-for="idea in filtered"
         :key="idea.id"
-        class="rounded-2xl border bg-card p-5 transition-shadow hover:shadow-sm"
+        class="rounded-2xl border bg-card p-5"
       >
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="min-w-0 flex-1 space-y-2">
+        <!-- P0: вертикальный стек вместо flex-ряда. Ряд «текст + кнопки в строку»
+             схлопывал колонку заголовка до 10px на 360px (flex-1 с basis 0% против
+             shrink-0 кнопок на 248px): заголовок шёл по слову в строку и залезал
+             под кнопку. Кнопки — равные flex-1 на всю ширину, h-11 (44px тач-цель). -->
+        <div class="space-y-3">
+          <div class="min-w-0 space-y-2">
             <NuxtLink
               :to="`/ideas/${idea.id}`"
               class="text-lg font-bold leading-snug text-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -271,13 +275,13 @@ const emptyText = computed(() =>
           </div>
           <div
             v-if="!isDemo"
-            class="flex shrink-0 flex-wrap gap-2"
+            class="flex gap-2 border-t border-border pt-3"
           >
             <button
               v-if="idea.funnelStage !== 'mvp_ready'"
               type="button"
               :disabled="busyIdeaId === idea.id"
-              class="inline-flex h-10 items-center gap-1.5 rounded-full bg-secondary px-4 text-sm font-medium text-[#111111] transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-secondary px-4 text-sm font-medium text-[#111111] transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               @click="runAnalysis(idea)"
             >
               <Icon
@@ -290,7 +294,7 @@ const emptyText = computed(() =>
             <button
               type="button"
               :disabled="busyIdeaId === idea.id"
-              class="inline-flex h-10 items-center rounded-full border bg-background px-4 text-sm font-medium transition-colors hover:bg-surface disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="inline-flex h-11 flex-1 items-center justify-center rounded-full border bg-background px-4 text-sm font-medium transition-colors hover:bg-surface disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               @click="archive(idea)"
             >
               В архив
