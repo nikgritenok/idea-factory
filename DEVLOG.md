@@ -26,6 +26,12 @@
   `config/tsconfig.json` (с `paths` для `~~`, иначе `PipelineStep` резолвился в `error` type) и
   `services/validator/tsconfig.json` (у сервиса были свои `package.json` и Dockerfile, но не было
   tsconfig). Parsing-ошибок после этого — 0
+- **отвергнуто измерением:** соблазн вытащить корневые конфиги тулинга в реальный проект через
+  `include` в `tsconfig.json` убивает и то, и другое — solution-style корневой конфиг (`files: []`)
+  с `include` становится настоящим проектом, `pnpm typecheck` падает на не-composite ссылках
+  (TS6306/TS6310), а ESLint вырастает с 58 до 342 ошибками. Побочно корневой конфиг без `noEmit`
+  наэмитил 13 `.js` рядом с исходниками и `tsconfig.tsbuildinfo` — убрано, в `git status` чисто.
+  Оставлено как есть: короткий `allowDefaultProject` + реальные tsconfig у `config/` и сервиса
 **Починено в коде (только механика):** неиспользуемые `LlmError`/`LlmExecutorContext`/`type Rng`;
 `let result` → `const`; два избыточных `confidence = 'low'` в `comparison.ts`; вложенный тернарник
 и `== null` в `orchestrator.ts`; `!` в `prisma.config.ts` → явная проверка с текстом ошибки; лишнее

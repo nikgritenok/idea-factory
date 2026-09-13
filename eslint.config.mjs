@@ -262,10 +262,12 @@ export default withNuxt(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // typescript-eslint ограничивает default project 8 файлами и запрещает в этих
-          // glob'ах `**`, поэтому здесь только одиночные конфиги у корня.
-          // config/** сюда не входит: эти файлы попадают в программу `pnpm typecheck`
-          // через импорты из server/ (проверено), а в ESLint работают без type-aware правил.
+          // typescript-eslint запрещает здесь `**` и ограничивает default project 8 файлами,
+          // поэтому список короткий и только одиночные конфиги у корня. Держать их в
+          // реальном проекте нельзя: `include` в корневом solution-style tsconfig
+          // (files: []) превращает его в проект — `pnpm typecheck` падает с TS6306/TS6310
+          // на не-composite ссылках, а линт вырастает со 58 до 332 ошибок (проверено).
+          // config/** и services/validator/** — не здесь: у них свои tsconfig.json.
           allowDefaultProject: [
             'e2e/*.ts',
             'playwright.config.ts',
