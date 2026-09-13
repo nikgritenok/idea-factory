@@ -1,6 +1,58 @@
 # DEVLOG.md — Журнал разработки
 
-## [2026-09-14 / шаг 17] Evlog доведён до доки: fs-drain с ротацией, `/docs/**` в include, сэмплинг в проде
+## [2026-09-14 / шаг 18] 21 роут на `useLogger` + `createError` из evlog; мёртвый `apiError` удалён
+**Запрос:** «во всех server/api роутах используй useLogger + createError из evlog с полями why и fix».
+**Найденный попутно дефект:** `server/utils/api/error.ts` с `apiError()` не вызывался **ни из одного** роута —
+все 21 кидали сырой `createError({ statusCode, statusMessage })`, что прямо запрещено AGENTS.md («Never raw
+`createError`»). То есть правило §6 описывало envelope `{ error: { code, message } }`, которого в ответах не
+было. Клиент (`CreateIdeaForm.vue`, `extractApiMessage`) читал `e.data?.error?.message` → всегда `undefined`,
+и пользователю показывалась заглушка из `e.message`. Удаление хелпера вместе с миграцией — единственная
+версия, где код и правило совпадают.
+**План:** `code` сохраняем (evlog поддерживает нативно, клиент ветвится по коду), `why`/`fix` по-русски,
+`/docs/:name` тоже мигрируем, `parseUuid` не трогаем (смена типа ошибки в `shared/schemas` — поведенческий
+ломкой change вне задания, см. «Открытый дефект»).
+**Результат:**
+- все 21 роута: `useLogger(event)` + `log.set()` по мере получения контекста; ошибки — `createError` из `evlog`
+  с `code`/`why`/`fix`
+- ответы дёшевы на утечки: `internal` для причин драйвера Postgres (`health`), для `reason` упавшего
+  MVP-потока и для статуса валидатора; наружу — человекочитаемое `message`
+- коды отражают реальные ветки: `IDEA_NOT_FOUND`, `IDEA_ARCHIVED`, `IDEA_LIMIT_REACHED`, `JOB_NOT_FOUND`,
+  `JOB_STATE_CONFLICT`, `PIPELINE_STEP_INVALID`, `DOC_NOT_FOUND`, `DOC_UNREADABLE`, `AUDIO_MISSING`,
+  `STT_NOT_CONFIGURED`/`STT_UPSTREAM_ERROR`/`STT_PROCESSING_FAILED` (по фактическим `throw` в `enqueue.ts`
+  и `stt.ts`, не по догадке)
+- SSE `stream.get.ts`: логгер только до открытия потока. Широкое событие эмитится на закрытии соединения,
+  после `emit()` логгер запечатан, `log.fork` в Nuxt-интеграции нет — `log.set()` внутри `setInterval`
+  потерялся бы с warning'ом
+- `server/utils/api/error.ts` удалён: `grep` по `app/ server/ shared/ config/ scripts/ e2e/` не нашёл ни
+  одного импорта — за него держались только правила в документах; `AGENTS.md` «API rules» и
+  `docs/conventions.md` §5/«Error format»/§7 переписаны в этом же коммите — иначе история коммита
+  содержала бы правило, противоречащее коду
+**Проверка (живой прогон на `pnpm dev`):**
+- `GET /api/ideas/00000000-…` → 404 телом `{"status":404,"message":"Идея не найдена","data":{"code":
+  "IDEA_NOT_FOUND","why":"В таблице Ideas нет записи с id=…","fix":"Вернитесь на доску…"}}`
+- `GET /docs/NOPE` → 404 с `code: DOC_NOT_FOUND`, в `fix` — перечень доступных документов
+- wide event: `/api/ideas` → `ideas.count`, `/api/health` → `health.db`, `/docs/NOPE` → `doc.known:false`,
+  404 идеи → `idea.id` + `level:"error"` + `status:404`
+- **доказательство смены слоя:** в стеке события было `at createError (…/h3/dist/index.mjs:71)` (замер шага 17),
+  стало `EvlogError: … at createError (…/.nuxt/dev/index.mjs:3692)`
+- `pnpm typecheck` → exit 0; `pnpm lint` → **152 errors / 5 warnings** против **158** на этом же дереве без
+  правки `server/` (замер через `git stash push -- server/` + `pop`), то есть миграция сняла 6 ошибок и
+  не добавила ни одной; в `server/api` и `server/routes` после правки — **ноль** проблем
+**Фиксы цикла проверки:** (1) `validatorPassed: verdict.passed` — поля `passed` в `ValidateResult` нет,
+реально `{ errors, valid }`, заменил на `validatorValid`/`validatorErrors`; (2) `stt: { words }` — в
+`TranscribeResult` нет `words`, оставил `cost`/`seconds`; (3) два вложенных тернарника (`sonarjs`) и
+неиспользуемый импорт `createError` в SSE — на `if/else if`; (4) иероглиф, попавший в комментарий SSE,
+и смешанный каламбур в комментарии к `ideas/index.get.ts`; (5) `JSON.parse(JSON.stringify(ticketCard))`
+в `mvp.post.ts` — наследственные 2 ошибки линта (`no-unsafe-assignment` + `prefer-structured-clone`),
+без их снятия коммит не проходит `lint-staged --max-warnings 0`. Первая попытка — `structuredClone` —
+**уронила typecheck**: JSON-прогон возвращал `any` и прятал, что `ValidateResult` это `interface`,
+а интерфейс без неявного index signature не входит в `JsonValue` Prisma (TS2769). Оставленный вариант
+собирает снимок литералом: ни `any`, ни `as`, поведение то же.
+
+**Открытый дефект (осознанно вне этого шага):** невалидный UUID в параметре даёт `ZodError` из
+`parseUuid` → 500 «Internal Server Error» вместо 400. Чинится в одном месте (`shared/schemas`), но это
+смена публичного типа ошибки — требует решения человека.
+
 **Запрос:** то же задание, пункт «поставь evlog по официальной доке, добавь в nuxt.config».
 **План:** модуль и блок `evlog` в конфиге уже были; не хватало двух — события никуда кроме stdout не
 писались (drain не зарегистрирован, а навык `analyze-logs` из `.agents/skills/` адресует `.evlog/logs/`),

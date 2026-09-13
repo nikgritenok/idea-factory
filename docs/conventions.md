@@ -98,35 +98,72 @@ const emit = defineEmits<{
 - Validate all incoming data with Zod at the boundary (start of the handler).
 - Business logic lives in `server/utils/` or `server/services/`.
 - Handlers stay thin: validate → call service → return.
-- Errors: use `apiError()` from `~~/server/utils/api/error`, never raw `createError`.
+- Errors: `createError` из `evlog` (явный импорт), всегда с `code`, `why` и `fix`. См. «Error format» ниже.
 - No side effects at module top level.
 - Schemas: import from `~~/shared/schemas`, not from `server/utils/schemas`.
 
 ### Error format
 
-All API errors use a standard envelope:
+Ошибку кидает сам роут, хелперов-обёрток нет — evlog-ошибка и есть контракт.
+Авто-импорт `createError` в Nuxt указывает на h3-версию, она теряет `why`/`fix`/`link`,
+поэтому импорт в обработчиках явный.
 
 ```ts
-import { apiError } from '~~/server/utils/api/error'
+import { createError, useLogger } from 'evlog'
 
-throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
-throw apiError(409, 'IDEA_LIMIT_REACHED', 'Достигнут лимит', { activeCount: 10 })
+const log = useLogger(event)
+
+throw createError({
+  code: 'IDEA_NOT_FOUND',          // стабильный машинный идентификатор
+  message: 'Идея не найдена',       // человекочитаемо, безопасно для клиента
+  status: 404,
+  why: `В таблице Ideas нет записи с id=${ideaId}`,
+  fix: 'Вернитесь на доску и откройте существующую идею',
+  internal: { reason },            // только в wide event: ответы драйверов, stdout шагов
+})
 ```
 
-Response: `{ error: { code: string, message: string, details?: unknown } }`
+Ответ клиенту (сериализует error-handler evlog):
+
+```json
+{ "status": 404, "statusCode": 404, "message": "Идея не найдена",
+  "data": { "code": "IDEA_NOT_FOUND", "why": "…", "fix": "…" } }
+```
+
+`internal` в теле не появляется. Клиент читает ответ через `parseError` из `evlog`
+(авто-импорт), а не руками по `err.data.error.message`.
 
 ### Example API route
 
 ```ts
-// server/api/users/[id].get.ts
+// server/api/ideas/[id].get.ts
+import { createError, useLogger } from 'evlog'
+
+import { getIdeaById } from '~~/server/utils/ideas'
 import { parseUuid } from '~~/shared/schemas'
-import { getUserById } from '~~/server/utils/users'
 
 export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
   const id = parseUuid(getRouterParam(event, 'id'))
-  return getUserById(id)
+  log.set({ idea: { id } })
+
+  const idea = await getIdeaById(id)
+  if (!idea) {
+    throw createError({
+      code: 'IDEA_NOT_FOUND',
+      fix: 'Вернитесь на доску и откройте существующую идею',
+      message: 'Идея не найдена',
+      status: 404,
+      why: `В таблице Ideas нет записи с id=${id}`,
+    })
+  }
+
+  return { idea }
 })
 ```
+
+Пользовательский текст (транскрипт, текст обращения, аудио) в `log.set()` не кладётся —
+только идентификаторы и размеры.
 
 ## 6. TypeScript
 
@@ -145,7 +182,7 @@ export default defineEventHandler(async (event) => {
 - Rethrow with context; preserve `cause` when available. Never throw strings.
 - Never swallow rejections or errors.
 - Client: handle via `useError` / `showError` or the project error boundary.
-- Server: `createError({ statusCode, statusMessage, data })`.
+- Server: `createError({ code, message, status, why, fix, internal? })` из `evlog`; то, что нельзя показывать клиенту, — в `internal`.
 
 ## 8. Runtime & Environment (Node.js)
 

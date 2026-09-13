@@ -1,3 +1,4 @@
+import { createError, useLogger } from 'evlog'
 import { z } from 'zod'
 
 import { PIPELINE_VERSION } from '../../../../config/pipeline'
@@ -32,14 +33,24 @@ const VALIDATOR_VERSION = '1.0.0'
 // POST /api/ideas/:id/mvp — MVP-сценарий TZ §1/§10:
 // обращение → LLM-классификация → микросервис-валидатор → сохранённая карточка обращения.
 export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
   const ideaId = parseUuid(getRouterParam(event, 'id'))
   const body = await readValidatedBody(event, TicketSchema.parse)
+
+  // Текст обращения в событие не кладём — это пользовательские данные. Размер показателен.
+  log.set({ idea: { id: ideaId }, mvp: { textLength: body.text.length } })
 
   const idea = await db.orm.public.Ideas
     .where(f => f.id.eq(ideaId))
     .first()
   if (!idea) {
-    throw createError({ statusCode: 404, statusMessage: 'Идея не найдена' })
+    throw createError({
+      code: 'IDEA_NOT_FOUND',
+      fix: 'Откройте другую идею на доске — для этой карточки запись уже удалена',
+      message: 'Идея не найдена',
+      status: 404,
+      why: `MVP-сценарий просили запустить для id=${ideaId}, такой идеи в базе нет`,
+    })
   }
 
   const runId = await createRun({
@@ -49,6 +60,8 @@ export default defineEventHandler(async (event) => {
     isFixture: false,
     variant: 'mvp_ticket_flow',
   })
+
+  log.set({ run: { id: runId, variant: 'mvp_ticket_flow' } })
 
   try {
     // Шаг 1: LLM-классификация (реальный вызов routerai.ru)
@@ -76,6 +89,15 @@ export default defineEventHandler(async (event) => {
       }, runId),
     )
 
+    log.set({
+      mvp: {
+        category: classification.data.category,
+        department: classification.data.department,
+        validatorErrors: verdict.errors.length,
+        validatorValid: verdict.valid,
+      },
+    })
+
     // Шаг 3: карточка обращения сохраняется в историю версий идеи (MVP-артефакт)
     const ticketCard = {
       classification: classification.data,
@@ -95,7 +117,15 @@ export default defineEventHandler(async (event) => {
     await db.orm.public.IdeaVersions.create({
       changedFields: { mvp_ticket_added: true },
       ideaId,
-      snapshot: { mvpTicket: JSON.parse(JSON.stringify(ticketCard)) },
+      // Снимок — JSON-колонка. validator разворачиваем литералом: ValidateResult — это
+      // interface, а интерфейс без неявного index signature в Prisma JsonValue не входит.
+      // Раньше это прятал JSON.parse(JSON.stringify(...)), который возвращает any.
+      snapshot: {
+        mvpTicket: {
+          ...ticketCard,
+          validator: { errors: [...verdict.errors], valid: verdict.valid },
+        },
+      },
       version: (latestVersion?.version ?? 0) + 1,
     })
 
@@ -107,9 +137,20 @@ export default defineEventHandler(async (event) => {
       validator: verdict,
     }
   }
-  catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    await finishRun(runId, 'failed', message).catch(() => {})
-    throw createError({ statusCode: 502, statusMessage: `MVP-сценарий упал: ${message}` })
+  catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    await finishRun(runId, 'failed', reason).catch(() => {})
+
+    // Ответ шага LLM/валидатора наружу не отдаём: там бывают URL и ответы шлюза.
+    // reason уходит в internal — попадает в wide event, но не в HTTP-тело.
+    throw createError({
+      cause: error instanceof Error ? error : undefined,
+      code: 'MVP_FLOW_FAILED',
+      fix: 'Откройте экран «Прогоны» — там видно шаг, на котором упал поток, и повторите с него',
+      internal: { reason, runId },
+      message: 'MVP-сценарий не дошёл до конца',
+      status: 502,
+      why: 'Ошибка на шаге классификации или валидации; причина записана в широком событии запроса',
+    })
   }
 })

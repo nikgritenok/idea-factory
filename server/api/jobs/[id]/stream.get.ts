@@ -1,3 +1,4 @@
+import { useLogger } from 'evlog'
 import { setResponseHeader, setResponseStatus } from 'h3'
 
 import { db } from '../../../utils/db'
@@ -5,8 +6,16 @@ import { parseUuid } from '../../../utils/schemas'
 
 // GET /api/jobs/:id/stream — SSE-поток обновлений статуса задачи
 // Просвечивает БД каждые 2 сек, пушит при изменении currentStep или status.
+//
+// Широкое событие этого запроса эмитится на ЗАКРЫТИИ потока: SSE держит соединение
+// открытым, поэтому в логе оно появится одной строкой за всю жизнь подписки, с итоговой
+// durationMs. Логгер после emit запечатан (в Nuxt-интеграции нет log.fork), так что
+// log.set() внутри setInterval ниже — не писать: значения молча потеряются с warning'ом.
 export default defineEventHandler((event) => {
+  const log = useLogger(event)
   const jobId = parseUuid(getRouterParam(event, 'id'))
+
+  log.set({ job: { id: jobId, stream: true } })
 
   setResponseStatus(event, 200)
   setResponseHeader(event, 'Content-Type', 'text/event-stream')
@@ -16,8 +25,8 @@ export default defineEventHandler((event) => {
 
   const nodeRes = event.node.res
 
-  let lastStep: string | null = null
-  let lastStatus: string | null = null
+  let lastStep: null | string = null
+  let lastStatus: null | string = null
   let closed = false
 
   function send(data: Record<string, unknown>): void {
@@ -38,9 +47,9 @@ export default defineEventHandler((event) => {
           return
         }
 
-        const currentStep = (job as { currentStep?: string | null }).currentStep ?? null
+        const currentStep = (job as { currentStep?: null | string }).currentStep ?? null
         const status = (job as { status: string }).status
-        const error = (job as { error?: string | null }).error ?? null
+        const error = (job as { error?: null | string }).error ?? null
 
         if (currentStep !== lastStep || status !== lastStatus) {
           lastStep = currentStep

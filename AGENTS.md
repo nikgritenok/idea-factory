@@ -98,11 +98,23 @@ docker compose -f docker-compose.prod.yml up -d web
 ## API rules (enforced by convention, not tooling — violations are bugs)
 
 ```ts
-import { apiError } from '~~/server/utils/api/error'
-throw apiError(404, 'IDEA_NOT_FOUND', 'Идея не найдена')
+import { createError, useLogger } from 'evlog'
+
+const log = useLogger(event)
+log.set({ idea: { id: ideaId } })
+
+throw createError({
+  code: 'IDEA_NOT_FOUND',
+  message: 'Идея не найдена',
+  status: 404,
+  why: `В таблице Ideas нет записи с id=${ideaId}`,
+  fix: 'Вернитесь на доску и откройте существующую идею',
+})
 ```
 
-- Errors: `apiError(code, message, details?)` → envelope `{ error: { code, message, details? } }`. Never raw `createError`.
+- Errors: `createError` **from `evlog`**, always with `code` + `why` + `fix`. The auto-imported `createError` is Nuxt/h3's and silently drops `why`/`fix`/`link` — import it explicitly. `internal: {...}` holds what must not reach the client (driver messages, upstream stdout); it lands in the wide event, never in the HTTP body.
+- Response body: `{ status, message, data: { code, why, fix } }`. Clients read it with `parseError` from `evlog` (auto-imported), not by walking `err.data.error.message`.
+- Every handler takes `useLogger(event)` and adds context with `log.set()` as it learns it. Never put user text (transcript, ticket body, audio) into the event — ids and sizes only.
 - Handlers stay thin: validate → service → return. No business logic in route files.
 - Validate at boundaries with Zod: params via `parseUuid(getRouterParam(...))`, body via `readValidatedBody(event, Schema.parse)`, query via `getValidatedQuery`. Schemas live in `shared/schemas/`.
 - URLs: kebab-case plural nouns, no verbs (`/api/ideas`). Files: `server/api/<resource>/<verb>.<method>.ts`. Return the resource directly; `201` on create, `204` + empty return on delete.
