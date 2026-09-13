@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Priority } from '~~/shared/schemas'
+import { motion } from 'motion-v'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { extractApiMessage } from '../ideas/types'
 import { useVoiceInput } from '../voice-input/useVoiceInput'
 
@@ -69,10 +71,34 @@ async function handleSubmit(): Promise<void> {
       <h1 class="text-headline-lg font-bold leading-[1.2] tracking-headline-lg text-primary">
         Опишите идею текстом или голосом
       </h1>
-      <p class="max-w-[68ch] text-body-lg leading-[1.6] text-muted-foreground">
-        Расскажите, какой процесс хотите автоматизировать или улучшить — система превратит текст в карточку
-        идеи, поставит её в очередь и запустит исследование.
-      </p>
+      <div class="flex items-center gap-1.5">
+        <p class="text-body-md text-muted-foreground">
+          Текст превратится в карточку, встанет в очередь и запустится исследование.
+        </p>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                aria-label="Подробнее о том, что происходит с идеей"
+                class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-foreground transition-colors hover:bg-surface-tint"
+              >
+                <Icon
+                  name="lucide:circle-help"
+                  class="size-4"
+                  aria-hidden="true"
+                />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent class="border-primary bg-primary text-primary-foreground">
+              <p class="max-w-[52ch]">
+                Расскажите, какой процесс хотите автоматизировать или улучшить — система превратит
+                текст в карточку идеи, поставит её в очередь и запустит исследование.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     </header>
 
     <div
@@ -88,35 +114,35 @@ async function handleSubmit(): Promise<void> {
       @submit.prevent="handleSubmit"
     >
       <div class="space-y-2">
+        <label
+          for="transcript"
+          class="text-label-sm font-medium tracking-label-sm text-muted-foreground"
+        >
+          Текст идеи
+        </label>
         <div class="relative">
           <!-- §Forms & Inputs: белый фон, радиус 8px, body-md 16px (14px в поле даёт
                focus-zoom на iOS), рамка 1px #E2DFD8, фокус — синяя рамка. -->
           <textarea
             id="transcript"
             v-model="transcript"
-            rows="6"
+            rows="3"
             required
             minlength="10"
             :disabled="recording || transcribing"
-            :placeholder="recording ? 'Идёт запись…' : 'Опишите идею…'"
-            class="w-full resize-none rounded-sm border border-border bg-surface-bright px-3 py-3 text-body-md leading-[1.6] pr-24 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-foreground"
+            :placeholder="recording ? 'Идёт запись…' : 'Например: заявки из формы в CRM'"
+            class="max-h-64 w-full resize-none overflow-y-auto rounded-sm border border-border bg-surface-bright px-3 py-3 text-body-md leading-[1.6] [field-sizing:content] pr-24 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-foreground"
           />
 
           <div class="absolute right-2 top-2 flex items-center gap-1">
             <template v-if="!recording && !transcribing">
-              <button
-                v-if="hasText"
-                type="submit"
-                :disabled="!canSubmit"
-                aria-label="Отправить идею"
-                class="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-foreground"
-              >
-                <Icon name="lucide:send" class="size-4" />
-              </button>
+              <!-- DESIGN.md:440 — иконная кнопка: фон Warm Surface, иконка Ink.
+                   Отдельной submit-иконки в поле нет: primary на экране одна
+                   (кнопка «Сохранить идею» внизу формы). -->
               <button
                 type="button"
                 aria-label="Начать голосовой ввод"
-                class="inline-flex size-9 items-center justify-center rounded-full bg-secondary text-foreground transition-colors hover:opacity-90"
+                class="inline-flex size-9 items-center justify-center rounded-full bg-surface text-foreground transition-colors hover:bg-surface-tint"
                 @click="handleMic"
               >
                 <Icon name="lucide:mic" class="size-4" />
@@ -196,7 +222,10 @@ async function handleSubmit(): Promise<void> {
           Опишите идею подробнее — минимум 10 символов.
         </p>
 
-        <p class="text-right text-body-sm text-muted-foreground">
+        <p
+          v-if="hasText"
+          class="text-right text-body-sm text-muted-foreground"
+        >
           {{ transcript.trim().length }} символов
         </p>
       </div>
@@ -226,11 +255,28 @@ async function handleSubmit(): Promise<void> {
               type="button"
               role="radio"
               :aria-checked="priority === opt.value"
-              class="rounded-full px-4 py-1.5 text-label-md font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              :class="priority === opt.value ? 'bg-primary-soft text-primary' : 'text-foreground'"
+              class="relative rounded-full px-4 py-1.5 text-label-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              :class="priority === opt.value
+                ? 'font-bold text-primary ring-1 ring-inset ring-primary'
+                : 'font-medium text-foreground'"
               @click="priority = opt.value"
             >
-              {{ opt.label }}
+              <motion.span
+                v-if="priority === opt.value"
+                layout-id="priority-pill"
+                :transition="{ type: 'spring', stiffness: 420, damping: 34 }"
+                class="absolute inset-0 rounded-full bg-primary-soft"
+                aria-hidden="true"
+              />
+              <span class="relative inline-flex items-center gap-1">
+                <Icon
+                  v-if="priority === opt.value"
+                  name="lucide:check"
+                  class="size-3.5"
+                  aria-hidden="true"
+                />
+                {{ opt.label }}
+              </span>
             </button>
           </div>
         </div>

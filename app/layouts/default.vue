@@ -1,8 +1,17 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
+
 const route = useRoute()
 
+// Переход между экранами — только transform/opacity (§15). При ?motion=off обёртки
+// нет вовсе: reducedMotion:'always' не глушит opacity у декларативных компонентов,
+// и capture-скрины флапали бы. То же при системном prefers-reduced-motion.
+const motionOff = computed(() => route.query.motion === 'off')
+const prefersReduced = useReducedMotion()
+const noMotion = computed(() => motionOff.value || prefersReduced.value === true)
+
 const navItems = [
-  { icon: 'lucide:mic', label: 'Новая идея', to: '/' },
+  { icon: 'lucide:plus', label: 'Новая идея', to: '/' },
   { icon: 'lucide:list', label: 'Список идей', to: '/ideas' },
   { icon: 'lucide:settings', label: 'Настройки', to: '/settings' },
 ] as const
@@ -62,7 +71,22 @@ function isActive(to: string): boolean {
     </header>
 
     <main class="mx-auto max-w-[1200px] px-6 pb-24 pt-8 md:px-16 md:pb-8">
-      <slot />
+      <AnimatePresence
+        v-if="!noMotion"
+        mode="wait"
+        :initial="false"
+      >
+        <motion.div
+          :key="route.path"
+          :initial="{ opacity: 0, y: 8 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="{ opacity: 0, y: -4 }"
+          :transition="{ duration: 0.18 }"
+        >
+          <slot />
+        </motion.div>
+      </AnimatePresence>
+      <slot v-else />
     </main>
 
     <MobileBottomBar />
