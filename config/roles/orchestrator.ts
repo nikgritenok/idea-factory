@@ -29,7 +29,7 @@ export const orchestratorRole = {
 Верни СТРОГО JSON ровно в таком формате (без markdown, без пояснений):
 {"title":"краткое название (до 120 символов)","complexity":"low","priority":"high","estimatedMinutes":30,"steps":["шаг 1","шаг 2"],"notes":"примечания"}
 
-ПОМНИ: complexity и priority ТОЛЬКО на английском: "low", "medium", "high". steps — ОБЯЗАТЕЛЬНЫЙ массив строк.` ,
+ПОМНИ: complexity и priority ТОЛЬКО на английском: "low", "medium", "high". steps — ОБЯЗАТЕЛЬНЫЙ массив строк.`,
 
   schema: OrchestratorPlanSchema as unknown as OrchestratorPlan,
   temperature: 0.15,

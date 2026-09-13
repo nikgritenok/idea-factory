@@ -1,5 +1,5 @@
 <script setup lang="ts">
-navigateTo('/', { redirectCode: 301 })
+void navigateTo('/', { redirectCode: 301 })
 </script>
 
 <template>

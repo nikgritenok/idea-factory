@@ -122,7 +122,10 @@ export function computeVariant(
 export function computeScenarios(
   ds: GeneratedDataset,
   base: ModelParams,
-  seed: number,
+  // Сценарии детерминированы самой конструкцией overrides — seed здесь не участвует.
+  // Параметр оставлен: он часть сигнатуры расчётного модуля (TZ §5) и вызывается из
+  // computeEfficiency; убирать его — менять публичный API расчёта.
+  _seed: number,
 ): ScenarioResult[] {
   const variants: Array<{ name: ScenarioResult['name'], overrides: Partial<ModelParams> }> = [
     { name: 'base', overrides: {} },

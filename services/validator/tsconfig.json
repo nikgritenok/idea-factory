@@ -1,0 +1,18 @@
+{
+  // Отдельный микросервис (свои package.json и Dockerfile). Появился из-за линта:
+  // без него TypeScript project service не находил проект для src/*.ts, и файлы падали
+  // с «was not found by the project service». Запихнуть их в allowDefaultProject нельзя —
+  // там лимит 8 файлов на весь прогон. На сборку не влияет: сервис запускается
+  // `node src/index.ts`, typecheck приложения его и раньше не проверял.
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -54,7 +54,7 @@ async function loadArchived(): Promise<void> {
 
 watch(stageFilter, (v) => {
   if (v === 'archived' && archivedIdeas.value.length === 0) {
-    loadArchived()
+    void loadArchived()
   }
 })
 

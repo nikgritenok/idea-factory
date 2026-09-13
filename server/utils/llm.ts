@@ -1,5 +1,7 @@
 import type { z } from 'zod'
 
+import { log } from 'evlog'
+
 const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
 export const LLM_MODEL = 'z-ai/glm-5.3-flash'
 
@@ -110,16 +112,18 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
     totalTokens: data.usage?.total_tokens,
   }
 
-  // Логируем метрики вызова (для LangSmith трейсинга через LangGraph)
+  // Метрики вызова. Раньше — JSON строкой в stdout под флагом трассировки; теперь то же
+  // событие уходит в evlog (попадёт и в stdout, и в .evlog/logs/). Флаг сохраняем:
+  // вне трассировки лишних строк в логе не нужно.
   if (process.env.LANGSMITH_TRACING === 'true') {
-    console.log(JSON.stringify({
+    log.info({
       durationMs,
       event: 'llm_call',
       model: LLM_MODEL,
       step: options.step,
       temperature: options.temperature ?? 0.3,
       tokens: usage.totalTokens,
-    }))
+    })
   }
 
   return {

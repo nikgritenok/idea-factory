@@ -25,7 +25,7 @@ export default defineNitroPlugin(async () => {
   process.once('SIGTERM', () => void shutdown('SIGTERM'))
 
   console.log('[worker] WORKER_MODE=true — обработчик очереди запущен')
-  // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- fire-and-forget with error logging
+  // eslint-disable-next-line promise/prefer-await-to-then -- fire-and-forget with error logging
   void worker.start().catch(async (error) => {
     console.error('[worker] цикл обработки упал:', error)
     await handle.end()

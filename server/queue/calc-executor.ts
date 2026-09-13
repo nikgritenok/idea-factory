@@ -24,7 +24,7 @@ export const calcExecutor = async (ctx: StepContext): Promise<StepResult> => {
   await ctx.db.orm.public.Calculations.create({
     formula: output.result.formula.join('; '),
     ideaId: ctx.ideaId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JsonValue не принимает InputSummary с необязательными полями; привязка к колонке jsonb
     inputSummary: output.inputSummary as any,
     modelVersion: output.result.modelVersion,
 

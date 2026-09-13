@@ -8,7 +8,6 @@ const originalEnv = process.env
 beforeEach(() => {
   vi.resetModules()
   process.env = { ...originalEnv }
-  process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
 })
 
 afterEach(() => {

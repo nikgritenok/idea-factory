@@ -61,9 +61,9 @@ export async function recordRunCall(
       durationMs: call.durationMs,
       error: call.error ?? null,
       ok: call.ok,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- колонка jsonb в RunCalls: форма запроса известна только исполнителю
       request: call.request as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- колонка jsonb в RunCalls: ответ модели/сервиса произвольной формы
       response: call.response as any,
       runId,
     })

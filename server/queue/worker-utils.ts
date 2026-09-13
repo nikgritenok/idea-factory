@@ -41,7 +41,7 @@ export async function sleep(ms: number): Promise<void> {
 
 /** История чекпоинтов: находит snapshot, из которого шаг выполнится повторно */
 export async function findCheckpointBefore(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- чекпоинт LangGraph: форма snapshot известна только графу, описывать её здесь означало бы дублировать его типы
   graph: { getStateHistory(config: unknown): AsyncIterable<{ next: readonly string[], config: any }> },
   threadId: string,
   stepId: string,

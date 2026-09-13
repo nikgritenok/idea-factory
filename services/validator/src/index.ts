@@ -12,10 +12,10 @@ const VERSION = '1.0.0'
  * Без доступа к ключам оркестратора.
  */
 
-function parseBody(req: IncomingMessage): Promise<unknown> {
-  return new Promise((resolve, reject) => {
+async function parseBody(req: IncomingMessage): Promise<unknown> {
+  return await new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', chunk => chunks.push(chunk))
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
     req.on('end', () => {
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString()))
@@ -62,7 +62,8 @@ function handleVersion(_req: IncomingMessage, res: ServerResponse): void {
   sendJson(res, 200, { version: VERSION })
 }
 
-const server = createServer(async (req, res) => {
+/** Обработчик запроса: отдельно от createServer, чтобы callback был синхронным (void-возврат) */
+async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     if (req.method === 'POST' && req.url === '/validate') {
       await handleValidate(req, res)
@@ -78,6 +79,10 @@ const server = createServer(async (req, res) => {
     console.error('Validator error:', error)
     sendJson(res, 500, { error: 'Internal server error' })
   }
+}
+
+const server = createServer((req, res) => {
+  void handle(req, res)
 })
 
 server.listen(PORT, () => {

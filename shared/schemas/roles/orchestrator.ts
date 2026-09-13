@@ -54,7 +54,11 @@ export const OrchestratorPlanSchema = z.object({
   estimatedMinutes: MinutesSchema,
   /** Примечания для следующих шагов */
   notes: z.preprocess(
-    v => (v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v))),
+    (v) => {
+      if (v === null || v === undefined) return ''
+      if (typeof v === 'string') return v
+      return JSON.stringify(v)
+    },
     z.string().max(2000).optional(),
   ),
   /** Приоритет идеи (high/medium/low) */
@@ -73,7 +77,7 @@ export const OrchestratorPlanSchema = z.object({
   steps: z.preprocess(
     (v) => {
       if (Array.isArray(v)) return v
-      if (v == null) return ['анализ идеи']
+      if (v === null || v === undefined) return ['анализ идеи']
       return [String(v)]
     },
     z.array(StepItemSchema).min(1).max(50).catch(['анализ идеи']),

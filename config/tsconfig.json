@@ -1,0 +1,29 @@
+{
+  // /config — промпты, роли, лимиты и версии моделей (отдельный от UI слой по AGENTS.md).
+  // Нужен для линта: эти файлы импортируются из server/ и `pnpm typecheck` их проверяет
+  // через программу сервера, но TypeScript project service в ESLint ищет проект по
+  // соседним tsconfig.json — без этого файла 15 из config/** падали с
+  // «was not found by the project service». В allowDefaultProject их положить нельзя:
+  // там лимит 8 файлов на весь прогон. На сборку не влияет — Nuxt читает свои
+  // .nuxt/tsconfig.*.json, этот никем не собирается.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "paths": {
+      // config/** импортирует из server/, а те — через ~~/. Без этого TypeAlias
+      // не резолвится и ESLint видит 'error' type вместо типа.
+      "~~/*": ["../*"],
+      "@@/*": ["../*"],
+      "~/*": ["../app/*"],
+      "@/*": ["../app/*"]
+    },
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

@@ -42,7 +42,7 @@ const CRITIC_FIXTURE = JSON.stringify({
 function userPrompt(role: string, idea: string): string {
   const cfg = getRoleConfig(role)
   if (cfg && 'user' in cfg && typeof cfg.user === 'function') {
-    const fn = cfg.user as (...args: string[]) => string
+    const fn = cfg.user
     if (role === 'strategist') return fn(idea, MARKET_FIXTURE)
     if (role === 'critic') return fn(idea, CRITIC_FIXTURE)
     return fn(idea)

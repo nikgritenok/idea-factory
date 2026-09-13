@@ -31,7 +31,6 @@ export default defineEventHandler((event) => {
 
   try {
     // Путь из ALLOWED-маппинга, не из пользовательского ввода — allowlist защищает от traversal
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- путь из фиксированного allowlist выше
     const content = readFileSync(join(process.cwd(), rel), 'utf8')
     setHeader(event, 'content-type', 'text/plain; charset=utf-8')
     log.set({ doc: { bytes: content.length, path: rel } })

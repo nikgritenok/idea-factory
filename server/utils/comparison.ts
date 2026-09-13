@@ -69,11 +69,9 @@ export async function compareRuns(
   }
   else if (metrics1.avgDurationMs < metrics2.avgDurationMs) {
     winner = variant1.variant
-    confidence = 'low'
   }
   else if (metrics2.avgDurationMs < metrics1.avgDurationMs) {
     winner = variant2.variant
-    confidence = 'low'
   }
 
   return {

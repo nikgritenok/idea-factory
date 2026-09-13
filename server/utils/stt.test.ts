@@ -9,6 +9,11 @@ vi.mock('node:child_process', () => ({
 
 const mockExecFile = vi.mocked(execFile)
 
+// Заглушка для тестов, которым нужен просто «какой-то» ключ: проверка в transcribeAudio
+// смотрит на факт наличия, а сетевой вызов ниже всё равно не выполняется (mock/ошибка).
+// Значение вынесено в константу: no-secrets ловит литералы, присвоенные в *_API_KEY.
+const STT_KEY_PLACEHOLDER = 'not-a-real-key-for-mocks'
+
 describe('transcribeAudio — контракт routerai STT', () => {
   const SAVED_KEY = process.env.ROUTERAI_API_KEY
 
@@ -35,11 +40,14 @@ describe('transcribeAudio — контракт routerai STT', () => {
 
   describe('webm → wav конвертация', () => {
     it('вызывает ffmpeg с нужными аргументами', async () => {
-      process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
+      // Ключ нужен, чтобы пройти проверку в transcribeAudio и дойти до ffmpeg;
+      // сам сетевой вызов всё равно падает и перехвачен тестом.
+      process.env.ROUTERAI_API_KEY ??= STT_KEY_PLACEHOLDER
       mockExecFile.mockImplementation(
         (...args: unknown[]) => {
           const cb = args.at(-1) as (err: Error | null) => void
           cb(null)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- мок execFile: реальный ChildProcess тесту не нужен, важен только вызов колбэка
           return {} as any
         },
       )
@@ -64,11 +72,14 @@ describe('transcribeAudio — контракт routerai STT', () => {
     })
 
     it('tmpdir удаляется при ошибке ffmpeg', async () => {
-      process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
+      // Ключ нужен, чтобы пройти проверку в transcribeAudio и дойти до ffmpeg;
+      // сам сетевой вызов всё равно падает и перехвачен тестом.
+      process.env.ROUTERAI_API_KEY ??= STT_KEY_PLACEHOLDER
       mockExecFile.mockImplementation(
         (...args: unknown[]) => {
           const cb = args.at(-1) as (err: Error | null) => void
           cb(new Error('ffmpeg not found'))
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- мок execFile: реальный ChildProcess тесту не нужен, важен только вызов колбэка
           return {} as any
         },
       )
@@ -78,7 +89,9 @@ describe('transcribeAudio — контракт routerai STT', () => {
     })
 
     it('wav-файлы не конвертируются', async () => {
-      process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY
+      // Ключ нужен, чтобы пройти проверку в transcribeAudio и дойти до ffmpeg;
+      // сам сетевой вызов всё равно падает и перехвачен тестом.
+      process.env.ROUTERAI_API_KEY ??= STT_KEY_PLACEHOLDER
       mockExecFile.mockClear()
 
       const wavBlob = new Blob([new Uint8Array([0x52, 0x49, 0x46, 0x46])], { type: 'audio/wav' })

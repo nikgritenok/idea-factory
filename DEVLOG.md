@@ -1,5 +1,61 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-14 / шаг 20] Чистка ESLint: убран шум, починен projectService; 152 ошибки → 58, warning'ов 0
+**Запрос:** отдельно от задания по evlog — вырезать из `eslint.config.mjs` правила, дающие шум
+(perfectionist целиком, `vue/max-attributes-per-line`, `@stylistic/brace-style`,
+`sonarjs/prefer-*`, `unicorn/prefer-ternary`, `security/detect-non-literal-*` и др.), починить
+`projectService.allowDefaultProject` и оставить правила, которые ловят баги.
+**Результат по конфигу:**
+- удалён `eslint-plugin-perfectionist` (импорт, блок, зависимость) — 5 правил сортировки, главный
+  генератор шума: один сгенерированный `src/prisma/contract.d.ts` давал 28 ошибок
+- удалены `unicorn/{prefer-structured-clone,prefer-ternary,prefer-logical-operator-over-ternary,consistent-function-scoping}`,
+  `sonarjs/{no-duplicate-string,prefer-single-boolean-return,prefer-immediate-return,no-small-switch,prefer-object-literal,prefer-while}`,
+  `promise/prefer-await-to-callbacks`, `security/{detect-non-literal-regexp,detect-child-process,detect-non-literal-fs-filename}`
+- выключены приходящие из базового @nuxt/eslint-config: `vue/max-attributes-per-line`, `vue/no-multiple-template-root`,
+  `@stylistic/brace-style`, `@stylistic/max-statements-per-line`
+- `max-lines` для `app/**/*.vue` поднят 250 → 350 по решению владельца (`FunnelBoard.vue`
+  превышал и старый лимит); `src/prisma/**`, `.opencode/**`, `.agents/**` — в ignores
+- сохранены: все type-aware `@typescript-eslint/*`, `slop/*`, `ai-guard/*`, `eqeqeq`, `no-eval`,
+  `no-self-assign`, архитектурные `no-restricted-*`, `max-params`, `sonarjs/cognitive-complexity`,
+  критичные `security/*`
+**projectService — починено измерением, а не на глаз:**
+- причина «was not found by the project service»: в `allowDefaultProject` лежал `config/*.ts`,
+  а файлы живут в `config/roles/` и `config/components/` — одноуровневый glob их не накрывал
+- доковать нельзя: typescript-eslint **запрещает `**` в этом поле** и ограничивает default project
+  **8 файлами**, а в `config/**` их 15. Отсюда два реальных проекта вместо раздувания списка:
+  `config/tsconfig.json` (с `paths` для `~~`, иначе `PipelineStep` резолвился в `error` type) и
+  `services/validator/tsconfig.json` (у сервиса были свои `package.json` и Dockerfile, но не было
+  tsconfig). Parsing-ошибок после этого — 0
+**Починено в коде (только механика):** неиспользуемые `LlmError`/`LlmExecutorContext`/`type Rng`;
+`let result` → `const`; два избыточных `confidence = 'low'` в `comparison.ts`; вложенный тернарник
+и `== null` в `orchestrator.ts`; `!` в `prisma.config.ts` → явная проверка с текстом ошибки; лишнее
+утверждение в `scripts/test-roles.ts`; `parseBody`/`createServer` в валидаторе (callback теперь
+синхронный, async-логика в `handle`); описания у 4 directive-комментариев; `void` для 2 floating
+promises; `console.log` метрик LLM → `log.info` evlog; `env.X = env.X` → явная заглушка.
+**Цикл «сломал — нашёл — починил»:** удаление `process.env.ROUTERAI_API_KEY = process.env.ROUTERAI_API_KEY`
+в `stt.test.ts` уронило 2 теста (6 failed/60 passed → **8 failed/58 passed**, замерено через
+`git stash push` + `pop`). Строка была не пустяком: в Node присваивание `undefined` property у env
+пишет строку `"undefined"`, то есть truthy — на этом держался проход мимо проверки ключа к ffmpeg.
+Восстановлено явно: `process.env.ROUTERAI_API_KEY ??= STT_KEY_PLACEHOLDER` (комментарий в самом тесте и так обещал «упадёт с test-key»). В `llm.test.ts`
+та же строка была настоящим no-op (ключ в `.env` — пустая строка), там она удалена.
+Второй эпизод того же цикла: явная заглушка `??= 'test-key'` попалась в `no-secrets` (литерал в
+переменной с именем `*_API_KEY`) — и это правило отработало правильно. Заглушку вынес в константу
+`STT_KEY_PLACEHOLDER`; вариант `if (!…) … =` отвергнут `prefer-nullish-coalescing`, а `??=` оставлен
+после замера: в окружении vitest ключ именно `undefined`, не пустая строка, так что `??=` покрывает
+случай и тесты на нём зелёные.
+**Проверка:** `pnpm lint` → **58 errors / 0 warnings** против **152 / 5** до чистки и 157/158 по
+записанному baseline; parsing-ошибок 0; `pnpm typecheck` → exit 0; `pnpm test` → **6 failed / 60 passed**
+— идентично baseline этого же коммита, новых падений 0; микросервис-валидатор поднят через `tsx` и
+проверен живьём: `/version` → `1.0.0`, `/validate` → `{"valid":true,"errors":[]}`, на плохую пару →
+ошибка схемы, на битый JSON → `{"valid":false,"errors":["Некорректный JSON"]}` (это путь в изменённом
+`parseBody`).
+**Остаток 58 — осознанно не правлю молча:** 23 `slop/no-chained-type-assertions` и ~26
+`@typescript-eslint/no-unsafe-*` почти целиком в `server/queue/*` (`as unknown as JobRow` на строках
+Prisma, `schema: XSchema as unknown as X` в конфигах ролей) плюс `max-lines`/`max-params`/
+cognitive-complexity в `worker.ts`. Это рефакторинг с поведенческой поверхностью в коде, чьи тесты
+красные с baseline (нужны ROUTERAI_API_KEY и тестовая БД) — чинить их вслепую означало бы выдать
+непроверенное за проверенное. Варианты и цена — в отчёте человеку.
+
 ## [2026-09-14 / шаг 19] Клиент читает ошибки через `parseError`; починен user-visible дефект текста ошибки
 **Запрос:** продолжение задания, согласованное решение «да, правим фронт под evlog».
 **Результат:**

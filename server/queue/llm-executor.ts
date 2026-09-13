@@ -1,7 +1,7 @@
 import type { StepContext, StepResult } from './types'
 
 import { getRoleConfig } from '../../config/roles'
-import { callLlm, LlmError } from '../utils/llm'
+import { callLlm } from '../utils/llm'
 import { withRunCall } from './run-protocol'
 
 /**
@@ -12,11 +12,6 @@ import { withRunCall } from './run-protocol'
  * Паттерн: role ID из pipeline.ts → конфиг роли → промпт → LLM → Zod-валидация → результат.
  * Битый ответ модели → LlmError → retry (если retries > 0).
  */
-
-interface LlmExecutorContext extends StepContext {
-  /** Дополнительные данные для промпта (например, результаты предыдущих шагов) */
-  promptData?: Record<string, unknown>
-}
 
 /**
  * Формирует user prompt на основе роли и входных данных.
@@ -121,9 +116,9 @@ export function createLlmExecutor(roleId: string) {
       )
     }
 
-    let result: Awaited<ReturnType<typeof callFn>>
-
-    result = ctx.db && runId ? (await withRunCall(runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn)) : (await callFn())
+    const result: Awaited<ReturnType<typeof callFn>> = ctx.db && runId
+      ? (await withRunCall(runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn))
+      : (await callFn())
 
     return {
       output: {

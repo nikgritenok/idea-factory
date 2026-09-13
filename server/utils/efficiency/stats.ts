@@ -3,7 +3,7 @@
  * для средней разницы «база − вариант». Seed фиксируется → воспроизводимо.
  */
 
-import { mulberry32, type Rng } from './prng'
+import { mulberry32 } from './prng'
 
 export interface BootstrapResult {
   ci: { lower: number, upper: number }
