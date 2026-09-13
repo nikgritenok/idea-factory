@@ -3,6 +3,18 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
   modules: ['@nuxt/eslint', 'evlog/nuxt', '@nuxt/icon', 'motion-v/nuxt'],
+  // На стенде wide event пишется и в stdout (его собирает Dokploy), и в файл
+  // (.evlog/logs/, см. server/plugins/evlog-drain.ts). Чтобы файл не разрастался,
+  // info-события сэмплируются, а error/warn остаются 100% и медленные/ошибочные
+  // запросы force-keep'ятся.
+  $production: {
+    evlog: {
+      sampling: {
+        keep: [{ duration: 1000 }, { status: 400 }],
+        rates: { debug: 0, info: 10 },
+      },
+    },
+  },
   devtools: { enabled: true },
   app: {
     head: {
@@ -56,9 +68,13 @@ export default defineNuxtConfig({
   },
   evlog: {
     env: {
+      environment: process.env.APP_ENV ?? 'development',
       service: 'idea-factory',
     },
-    include: ['/api/**'],
+    // Паттерн включает НЕ создание логгера (он в Nuxt-интеграции создаётся на любой
+    // запрос), а emit широкого события. Без `/docs/**` роут server/routes/docs/[name].get.ts
+    // копил контекст и молча его терял.
+    include: ['/api/**', '/docs/**'],
     transport: {
       enabled: true,
     },

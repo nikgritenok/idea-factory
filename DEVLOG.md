@@ -1,5 +1,28 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-14 / шаг 17] Evlog доведён до доки: fs-drain с ротацией, `/docs/**` в include, сэмплинг в проде
+**Запрос:** то же задание, пункт «поставь evlog по официальной доке, добавь в nuxt.config».
+**План:** модуль и блок `evlog` в конфиге уже были; не хватало двух — события никуда кроме stdout не
+писались (drain не зарегистрирован, а навык `analyze-logs` из `.agents/skills/` адресует `.evlog/logs/`),
+и `include: ['/api/**']` оставлял без события `server/routes/docs/[name].get.ts`.
+**Результат:**
+- `server/plugins/evlog-drain.ts` — `evlog:drain` + `createFsDrain({ maxFiles: 7, maxSizePerFile: 10 МБ })`;
+  потолок ~70 МБ на контейнер, самое старое адаптер удаляет сам после записи
+- `nuxt.config.ts`: `env.environment` из `APP_ENV`, `include: ['/api/**', '/docs/**']`,
+  и `$production.evlog.sampling` — `rates: { info: 10, debug: 0 }` при 100% для warn/error
+  и `keep: [{ duration: 1000 }, { status: 400 }]`
+- поведение доки, а не догадка: `useLogger` бросает, если логгер не инициализирован, но Nitro-плагин
+  evlog создаёт `event.context.log` на **каждом** запросе — `include` влияет только на emit. Поэтому
+  `/docs/**` было безопасно логировать и до правки, оно просто молча теряло событие.
+**Проверка (живой прогон, не «должно работать»):** старый dev-сервер (22 ч, потомок закрытой сессии, трое
+сирот, `/api/health` → 503 при живой БД) перезапущен; `GET /api/health` → 200 `{"db":"ok"}`;
+в `.evlog/logs/2026-09-13.jsonl` широкие события с `requestId`/`status`/`durationMs`/`service`/`environment`;
+`GET /docs/TZ` — впервые дал событие (до правки не давал), `GET /docs/NOPE` — событие с `error`;
+`.evlog/.gitignore` создан адаптером сам, в `git status` каталога нет.
+В стеке ошибки видно `createError` из `h3` — подтверждение, что роуты ещё не на evlog, это шаг 18.
+`pnpm typecheck` → exit 0; `eslint` по изменённым файлам → чисто (после `--fix` ключа `$production`:
+правило `nuxt/nuxt-config-keys-order`).
+
 ## [2026-09-14 / шаг 16] Sentry удалён полностью, наблюдаемость остаётся на evlog
 **Запрос:** «удали Sentry полностью и поставь вместо него evlog по официальной доке, добавь в nuxt.config,
 и во всех server/api роутах используй useLogger + createError из evlog с полями why и fix».
