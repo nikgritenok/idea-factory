@@ -1,5 +1,21 @@
 # DEVLOG.md — Журнал разработки
 
+## [2026-09-14 / шаг 24] Хотфикс деплойки: `prisma.config.ts` ронял Docker build без DATABASE_URL
+**Запрос:** лог упавшей деплойки из панели Dokploy после мёрджа задания.
+**Причина:** моя проверка из шага 20 (`if (!databaseUrl) throw new TypeError(...)`) вычисляется
+при каждом чтении конфига Prisma CLI — в том числе в `pnpm run postinstall` (`prisma skills sync`)
+на стадии Docker build, где `.env` нет и быть не должно. Старый `!` пропускал `undefined` дальше,
+а `skills sync` базу не трогает — поэтому раньше собиралось. Мой `throw` дал `postinstall` exit 2
+и уронил весь `docker build` (`target web: failed to solve`, exit code 1). Стенд при этом остался
+на старом контейнере — outage не было, но новый код не встал.
+**Исправление:** `process.env['DATABASE_URL'] ?? ''` + комментарий с запретом бросать здесь.
+Безвредность пустой строки на build'е — не догадка: `DATABASE_URL= pnpm exec prisma skills sync`
+(симуляция build-стадии) → `ok: true, exitCode: 0`. На рантайме URL приходит из окружения compose.
+**Проверка:** симуляция выше — exit 0; `eslint prisma.config.ts` чисто; `pnpm typecheck` exit 0.
+Ветка `hotfix/prisma-config-build-env`, мёрдж `--ff-only` в `main`, пуш = повторный деплой.
+Статус стенда после повторного пуша — проверить отдельным замером (404 с `code` + `X-Request-Id`).
+
+
 ## [2026-09-14 / шаг 23] Прод-сборка проверена поведенчески: сэмплинг, environment, маска uuid
 **Запрос:** «после изменений — реальный прогон, не «должно работать»»; оставалась одна непроверенная
 фраза — что `$production`-сэмплинг и fs-drain живут не только в dev.
