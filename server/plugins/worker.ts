@@ -1,7 +1,7 @@
 import { log } from 'evlog'
 
 import { PIPELINE_STEPS } from '../../config/pipeline'
-import { createCheckpointer } from '../queue/checkpointer'
+import { createCheckpointer, ensureCheckpointerTables } from '../queue/checkpointer'
 import { AnalysisWorker } from '../queue/worker'
 
 // Nitro-плагин постоянного воркера (TZ §8): состояние на сервере, закрытие
@@ -15,6 +15,11 @@ export default defineNitroPlugin(async () => {
   const { db } = await import('../utils/db')
 
   const handle = createCheckpointer()
+  // Таблицы чекпоинтов обязаны появиться ДО первого взятого задания. `worker-cli.ts`
+  // это делал, а Nitro-плагин — нет, и на публичном стенде (где воркер живёт как
+  // сервис `worker`, а не как CLI) любой прогон падал на первом же шаге:
+  // relation "public.checkpoints" does not exist. Мерка: прогон id 8979a507 на стенде.
+  await ensureCheckpointerTables(handle)
   const worker = new AnalysisWorker(db, { checkpointer: handle, steps: PIPELINE_STEPS })
 
   const shutdown = async (signal: string): Promise<void> => {
