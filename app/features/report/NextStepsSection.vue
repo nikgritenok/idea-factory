@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// Соседей из app/features не автоимпортируют (Nuxt сканирует только app/components),
+// поэтому импорт явный: без него секция молча не рендерилась.
+import NextStepsList from './NextStepsList.vue'
+
 defineProps<{
   steps: string[]
 }>()

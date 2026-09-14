@@ -2,6 +2,8 @@
 // именно здесь живёт правило «во время прогона кнопки «Запустить анализ» быть не должно».
 // Вынесено отдельно, чтобы проверялось тестом, а не скриншотом.
 
+import { phaseTitle } from '~~/shared/phase-names'
+
 export type CardAction = 'archive' | 'delete' | 'restore' | 'resume' | 'run' | 'stop'
 export type CardTone = 'error' | 'paused' | 'running'
 
@@ -61,13 +63,15 @@ export function planCardActions(funnelStage: string, job: JobSnapshot | null, jo
   }
 
   if (status === 'running') {
-    const step = job?.currentStep
+    // Человеческое имя фазы вместо `Идёт анализ · market_research`: технический id
+    // шага владельцу ничего не говорит, а читать его приходится на каждой карточке.
+    const phase = phaseTitle(job?.currentStep, '')
     return {
       actions: ['stop', 'archive'],
       plate: {
         icon: 'lucide:loader-2',
         spinning: true,
-        text: step ? `Идёт анализ · ${step}` : 'Идёт анализ',
+        text: phase ? `Идёт анализ · ${phase}` : 'Идёт анализ',
         tone: 'running',
       },
     }
@@ -79,7 +83,16 @@ export function planCardActions(funnelStage: string, job: JobSnapshot | null, jo
 
   if (status === 'failed') {
     // /run идемпотентен только для queued|running|paused, так что для failed он даёт новый прогон
-    return { actions: ['run', 'archive'], plate: { icon: 'lucide:circle-alert', spinning: false, text: 'Прогон упал', tone: 'error' } }
+    const phase = phaseTitle(job?.currentStep, '')
+    return {
+      actions: ['run', 'archive'],
+      plate: {
+        icon: 'lucide:circle-alert',
+        spinning: false,
+        text: phase ? `Прогон упал · ${phase}` : 'Прогон упал',
+        tone: 'error',
+      },
+    }
   }
 
   if (funnelStage === 'mvp_ready') {

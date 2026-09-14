@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// Компаньон из app/features не автоимпортируется (Nuxt сканирует только app/components):
+// без явного импорта секция молча оставалась пустой.
+import WeaknessCard from './WeaknessCard.vue'
+
 defineProps<{
   weaknesses: { description?: null | string, mitigation?: null | string, severity?: null | string }[]
 }>()

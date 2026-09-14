@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { PIPELINE_STEPS, PIPELINE_VERSION, QUEUE_CONFIG } from '~~/config/pipeline'
+import { phaseLabel } from '~~/shared/phase-names'
+import { Label } from '~/components/ui/label'
+import { Switch } from '~/components/ui/switch'
 
 const EXECUTOR_LABELS: Record<string, string> = {
   calc: 'Детерминированный расчёт',
   fixture: 'Сборка (fixture, детерминированная)',
   llm: 'LLM (реальный вызов)',
 }
+
+// Технические окна продукта (id шагов, тип исполнителя, лимиты очередей) — под
+// «режимом разработчика» (Пункт 4 ТЗ). По умолчанию выключен, хранится в localStorage.
+const { enabled: devMode, sync: syncDevMode, toggle: toggleDevMode } = useDevMode()
+onMounted(syncDevMode)
 </script>
 
 <template>
@@ -18,6 +26,37 @@ const EXECUTOR_LABELS: Record<string, string> = {
         Управляемые параметры анализа — всё, что проверяющий может посмотреть и проверить.
       </p>
     </header>
+
+    <section
+      class="space-y-3 rounded-2xl border bg-card p-6"
+      aria-labelledby="interface-heading"
+    >
+      <h2
+        id="interface-heading"
+        class="text-lg font-bold"
+      >
+        Интерфейс
+      </h2>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0 space-y-0.5">
+          <Label
+            for="dev-mode-switch"
+            class="text-sm font-medium"
+          >
+            Режим разработчика
+          </Label>
+          <p class="text-sm leading-6 text-muted-foreground">
+            Показывать технические детали: id шагов и ролей, сырые выходы агентов, seed и флаги формата.
+          </p>
+        </div>
+        <Switch
+          id="dev-mode-switch"
+          :checked="devMode"
+          class="shrink-0"
+          @update:checked="toggleDevMode"
+        />
+      </div>
+    </section>
 
     <section
       class="space-y-4 rounded-2xl border bg-card p-6"
@@ -52,9 +91,12 @@ const EXECUTOR_LABELS: Record<string, string> = {
           </span>
           <div class="min-w-0">
             <p class="text-sm font-medium">
-              {{ step.title }}
+              {{ phaseLabel(step.id) }}
             </p>
-            <p class="text-xs text-muted-foreground">
+            <p
+              v-if="devMode"
+              class="text-xs text-muted-foreground"
+            >
               роль: {{ step.role }} · исполнитель: {{ EXECUTOR_LABELS[step.executor] ?? step.executor }}
               · таймаут: {{ Math.round(step.timeoutMs / 1000) }} с · повторов: {{ step.retries }}
               <template v-if="'funnelStageAfter' in step && step.funnelStageAfter">

@@ -2,11 +2,18 @@
 import type { JobSummary } from '../jobs/types'
 
 import JobProgress from '../jobs/JobProgress.vue'
+import IdeaMvpPanel from './IdeaMvpPanel.vue'
+import IdeaOutputsPanel from './IdeaOutputsPanel.vue'
+import IdeaReportSummary from './IdeaReportSummary.vue'
 import { extractApiMessage, FUNNEL_LABELS, PRIORITY_LABELS } from './types'
 
 const route = useRoute()
 const ideaId = route.params.id as string
 const isDemo = computed(() => route.query.demo === '1')
+
+// Технические панели карточки — под «режимом разработчика» (Пункт 4 ТЗ).
+const { enabled: devMode, sync: syncDevMode } = useDevMode()
+onMounted(syncDevMode)
 
 const idea = ref<Awaited<ReturnType<typeof fetchIdea>>>(null)
 const job = ref<JobSummary | null>(null)
@@ -285,6 +292,11 @@ onUnmounted(() => {
             :idea-id="ideaId"
           />
 
+          <!-- Вывод прогона прямо в карточке: рекомендация, балл, главная цифра
+               эффекта и первые шаги. Раньше отчёт был только на отдельной
+               странице, и «красивого вывода в карточке» не существовало. -->
+          <IdeaReportSummary :idea-id="ideaId" />
+
           <div class="flex flex-wrap gap-3">
             <NuxtLink
               v-if="job?.status === 'done'"
@@ -313,6 +325,7 @@ onUnmounted(() => {
         <aside class="space-y-6">
           <JobProgress
             :busy="busy"
+            :idea-id="ideaId"
             :job="job"
             :readonly="isDemo"
             @cancel="jobAction('cancel')"
@@ -322,7 +335,12 @@ onUnmounted(() => {
             @run="runAnalysis"
           />
 
-          <IdeaOutputsPanel :idea-id="ideaId" />
+          <!-- Технические панели (журнал вызовов с флагами формата) — под режимом
+               разработчика: владельцу достаточно «Хода работы» с материалами. -->
+          <IdeaOutputsPanel
+            v-if="devMode"
+            :idea-id="ideaId"
+          />
         </aside>
       </div>
     </template>

@@ -1,46 +1,27 @@
 <script setup lang="ts">
 /**
- * Журнал вызовов ИИ-агентов по идее (TZ §4 — проверка обоснованности решений).
- * Вынесен из IdeaCard: своя загрузка, своё раскрытие, и держал карточку выше лимита max-lines.
+ * Журнал вызовов агентов (TZ §4 — проверка обоснованности решений).
+ * Панель техническая: формат ответа, устаревшие строки, роль-id. С 2026-09-14 она
+ * показывается только в «режиме разработчика» (useDevMode), а владелец видит
+ * «Ход работы» с материалами фаз.
+ *
+ * Данные берёт из useIdeaOutputs: тот же список нужен «Ходу работы», и twice
+ * одинаковых запроса на карточку быть не должно.
  */
-import { extractApiMessage } from './types'
-
-interface AgentOutput {
-  createdAt: string
-  formatValid: boolean
-  id: string
-  outdated: boolean
-  role: string
-}
+import { phaseTitle } from '~~/shared/phase-names'
+import { useIdeaOutputs } from './useIdeaOutputs'
 
 const props = defineProps<{ ideaId: string }>()
 
-const ROLE_LABELS: Record<string, string> = {
-  critic: 'Критик',
-  efficiency_analyst: 'Аналитик эффективности',
-  idea_analyst: 'Аналитик идеи',
-  market_analyst: 'Аналитик рынка',
-  orchestrator: 'Оркестратор',
-  report_editor: 'Редактор отчёта',
-  strategist: 'Стратег',
-}
-
-const outputs = ref<AgentOutput[]>([])
+const { error, loaded, load, outputs } = useIdeaOutputs(() => props.ideaId)
 const open = ref(false)
-const error = ref<null | string>(null)
 
-async function load(): Promise<void> {
-  error.value = null
-  try {
-    const data = await $fetch<{ outputs: AgentOutput[] }>(`/api/ideas/${props.ideaId}/outputs`)
-    outputs.value = data.outputs
+// Загружает сам, только если «Ход работы» ещё не потянул список: общий кэш по id идеи.
+onMounted(() => {
+  if (!loaded.value) {
+    void load()
   }
-  catch (err: unknown) {
-    error.value = extractApiMessage(err, 'Не удалось загрузить вызовы агентов')
-  }
-}
-
-await load()
+})
 
 const shown = computed(() => outputs.value.length > 0)
 </script>
@@ -80,7 +61,7 @@ const shown = computed(() => outputs.value.length > 0)
           class="rounded-xl bg-surface p-3 text-xs"
         >
           <div class="flex flex-wrap items-center gap-2">
-            <span class="font-medium">{{ ROLE_LABELS[out.role] ?? out.role }}</span>
+            <span class="font-medium">{{ phaseTitle(out.role) }} · {{ out.role }}</span>
             <span
               class="rounded-full px-2 py-0.5"
               :class="out.formatValid ? 'bg-success-soft text-success' : 'bg-destructive/10 text-destructive'"

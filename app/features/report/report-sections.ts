@@ -29,15 +29,8 @@ export const RECOMMENDATION_LABELS: Record<string, string> = {
   validate_first: 'Сначала провалидировать',
 }
 
-export const ROLE_LABELS: Record<string, string> = {
-  critic: 'Критик',
-  efficiency_analyst: 'Аналитик эффективности',
-  idea_analyst: 'Аналитик идеи',
-  market_analyst: 'Аналитик рынка',
-  orchestrator: 'Оркестратор',
-  report_editor: 'Редактор отчёта',
-  strategist: 'Стратег',
-}
+// Человеческие имена фаз живут в shared/phase-names (единственный источник):
+// локальный словарь ROLE_LABELS здесь только плодил второй вариант подписи.
 
 export function nextSteps(sections: ReportSection[]): string[] {
   const content = sections.find(section => section.key === 'nextSteps')?.content

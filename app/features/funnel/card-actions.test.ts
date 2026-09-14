@@ -15,10 +15,19 @@ describe('planCardActions', () => {
   })
 
   it('во время прогона кнопки запуска нет: есть плашка статуса и остановка', () => {
-    const plan = planCardActions('research', job('running', 'поиск аналогов на рынке'))
+    // currentStep приходит с сервера техническим id — на доске он обязан быть
+    // человеческим (shared/phase-names), иначе карточка говорит с владельцем по-серверному.
+    const plan = planCardActions('research', job('running', 'market_research'))
 
     expect(plan.actions).toEqual(['stop', 'archive'])
-    expect(plan.plate?.text).toBe('Идёт анализ · поиск аналогов на рынке')
+    expect(plan.plate?.text).toBe('Идёт анализ · Рынок и конкуренты')
+  })
+
+  it('неизвестный id шага не протекает в плашку сырым', () => {
+    const plan = planCardActions('research', job('running', 'brand_new_step'))
+
+    expect(plan.plate?.text).toBe('Идёт анализ')
+    expect(plan.plate?.text).not.toContain('brand_new_step')
   })
 
   it('queued — тоже активная задача: остановка, а не запуск', () => {

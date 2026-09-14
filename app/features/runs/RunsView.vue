@@ -1,22 +1,18 @@
 <script setup lang="ts">
-import RunsTables from './RunsTables.vue'
+import type { CalculationRow } from '~~/shared/efficiency-view'
 
-interface Calculation {
-  createdAt: string
-  formula: string
-  id: string
-  inputSummary: Record<string, unknown>
-  modelVersion: string
-  params: Record<string, unknown>
-  result: Record<string, unknown>
-  seed: number | string
-  warnings: unknown
-}
+import { phaseTitle } from '~~/shared/phase-names'
+import EfficiencyCard from '../report/EfficiencyCard.vue'
+import RunsTables from './RunsTables.vue'
 
 const route = useRoute()
 const ideaId = route.params.id as string
 
-const calculations = ref<Calculation[]>([])
+// Технические блоки этого экрана (формулы, дампы параметров, журнал прогонов) —
+// под «режимом разработчика» (Пункт 4 ТЗ). Владелец видит карточку эффекта.
+const { enabled: devMode, set: setDevMode, sync: syncDevMode } = useDevMode()
+
+const calculations = ref<CalculationRow[]>([])
 const runs = ref<InstanceType<typeof RunsTables>['$props']['runs']>([])
 const calls = ref<InstanceType<typeof RunsTables>['$props']['calls']>([])
 const loading = ref(true)
@@ -24,20 +20,29 @@ const loadError = ref<null | string>(null)
 
 const latest = computed(() => calculations.value[0] ?? null)
 
-const scenarios = computed(() => {
-  const r = latest.value?.result
-  if (!r) return []
-  const sc = r.scenarios ?? r
-  if (typeof sc !== 'object' || sc === null) return []
-  return Object.entries(sc as Record<string, unknown>)
+/** Сценарии из `result.result.scenarios` (то, что реально лежит в строке). */
+const scenarios = computed<Array<[string, unknown]>>(() => {
+  const inner = latest.value?.result as { result?: { scenarios?: unknown[] } } | undefined
+  const list = inner?.result?.scenarios
+  if (!Array.isArray(list)) {
+    return []
+  }
+  return list.map((item, i) => {
+    const obj = item as Record<string, unknown>
+    return [String(obj.name ?? `#${i + 1}`), obj] as [string, unknown]
+  })
 })
+
+function openTechnical(): void {
+  setDevMode(true)
+}
 
 async function load(): Promise<void> {
   loading.value = true
   loadError.value = null
   try {
     const [calcData, runsData] = await Promise.all([
-      $fetch<{ calculations: Calculation[] }>(`/api/ideas/${ideaId}/calculations`).catch(() => ({ calculations: [] })),
+      $fetch<{ calculations: CalculationRow[] }>(`/api/ideas/${ideaId}/calculations`).catch(() => ({ calculations: [] })),
       $fetch<{ runs: typeof runs.value, calls: typeof calls.value }>(`/api/ideas/${ideaId}/runs`).catch(() => ({ calls: [], runs: [] })),
     ])
     calculations.value = calcData.calculations
@@ -52,7 +57,10 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  syncDevMode()
+  void load()
+})
 
 function fmtDate(iso: null | string): string {
   if (!iso) return '—'
@@ -117,12 +125,27 @@ function fmt(value: unknown): string {
         role="status"
       >
         <p class="text-sm text-muted-foreground">
-          Расчётов пока нет. Эффективность считается на шаге «efficiency_model» после запуска анализа.
+          Расчётов пока нет. Эффективность считается на фазе «{{ phaseTitle('efficiency_model') }}» после запуска анализа.
         </p>
       </div>
 
       <template v-else>
+        <EfficiencyCard
+          v-if="latest.view"
+          :view="latest.view"
+        />
+
+        <button
+          v-if="!devMode"
+          type="button"
+          class="inline-flex h-11 items-center self-start rounded-full border bg-background px-4 text-sm text-muted-foreground hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          @click="openTechnical"
+        >
+          Технические детали
+        </button>
+
         <section
+          v-if="devMode"
           class="space-y-4 rounded-2xl border bg-card p-6"
           aria-labelledby="formula-heading"
         >
@@ -165,6 +188,7 @@ function fmt(value: unknown): string {
         </section>
 
         <section
+          v-if="devMode"
           class="space-y-4"
           aria-labelledby="scenarios-heading"
         >
@@ -203,6 +227,7 @@ function fmt(value: unknown): string {
       </template>
 
       <RunsTables
+        v-if="devMode"
         :calls="calls"
         :runs="runs"
       />

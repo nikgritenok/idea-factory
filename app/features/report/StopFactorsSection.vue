@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// Компаньон из app/features не автоимпортируется (Nuxt сканирует только app/components):
+// без явного импорта секция молча оставалась пустой.
+import StopFactorCard from './StopFactorCard.vue'
+
 interface StopFactor {
   description?: null | string
   reason?: null | string

@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { nextSteps, RECOMMENDATION_LABELS, ROLE_LABELS, weaknesses } from './report-sections'
+import type { CalculationRow } from '~~/shared/efficiency-view'
+
+import { isPhaseRole, phaseTitle } from '~~/shared/phase-names'
+import MaterialViewer from '../ideas/MaterialViewer.vue'
+import EfficiencyCard from './EfficiencyCard.vue'
+import NextStepsSection from './NextStepsSection.vue'
+import { nextSteps, RECOMMENDATION_LABELS, weaknesses } from './report-sections'
+import StopFactorsSection from './StopFactorsSection.vue'
+import WeaknessesSection from './WeaknessesSection.vue'
 
 interface ReportSection {
   content: unknown
@@ -35,22 +43,39 @@ const ideaId = route.params.id as string
 const idea = ref<Awaited<ReturnType<typeof fetchIdea>>>(null)
 const report = ref<null | ReportData>(null)
 const outputs = ref<AgentOutput[]>([])
+const calculation = ref<null | CalculationRow>(null)
 const loading = ref(true)
 const loadError = ref<null | string>(null)
 const showRaw = ref(false)
+
+// Технические окна (JSON-дампы, id ролей, флаги формата) — под «режимом
+// разработчика», по умолчанию выключен (Пункт 4 ТЗ).
+const { enabled: devMode, set: setDevMode, sync: syncDevMode } = useDevMode()
+onMounted(syncDevMode)
+
+/** Ссылка «Технические детали» в отчёте: включает режим и раскрывает журнал. */
+function openTechnical(): void {
+  setDevMode(true)
+  showRaw.value = true
+}
+
+/** Актуальные выходы фаз — те, у которых есть что открыть. */
+const materialPhases = computed(() => outputs.value.filter(o => !o.outdated && isPhaseRole(o.role)))
 
 async function load(): Promise<void> {
   loading.value = true
   loadError.value = null
   try {
-    const [ideaData, reportData, outputsData] = await Promise.all([
+    const [ideaData, reportData, outputsData, calculationsData] = await Promise.all([
       fetchIdea(ideaId),
       $fetch<{ report: null | ReportData }>(`/api/ideas/${ideaId}/report`).catch(() => ({ report: null })),
       $fetch<{ outputs: AgentOutput[] }>(`/api/ideas/${ideaId}/outputs`).catch(() => ({ outputs: [] })),
+      $fetch<{ calculations: CalculationRow[] }>(`/api/ideas/${ideaId}/calculations`).catch(() => ({ calculations: [] })),
     ])
     idea.value = ideaData
     report.value = reportData.report
     outputs.value = outputsData.outputs
+    calculation.value = calculationsData.calculations[0] ?? null
     if (!idea.value) loadError.value = 'Идея не найдена'
   }
   catch (err: unknown) {
@@ -188,6 +213,11 @@ const generalSections = computed(() =>
           </div>
         </section>
 
+        <EfficiencyCard
+          v-if="calculation?.view"
+          :view="calculation.view"
+        />
+
         <StopFactorsSection
           v-if="stopFactorList.length"
           :factors="stopFactorList"
@@ -219,52 +249,103 @@ const generalSections = computed(() =>
         </section>
 
         <section
-          class="space-y-4 rounded-2xl bg-inverse-surface p-6 text-inverse-on-surface"
+          class="space-y-4 rounded-2xl border bg-card p-6"
           aria-labelledby="sources-heading"
         >
-          <h2
-            id="sources-heading"
-            class="text-lg font-bold"
-          >
-            Выходы агентов (журнал)
-          </h2>
-          <p class="text-sm opacity-70">
-            Полные выходы каждой роли пайплайна — для проверки обоснованности.
-          </p>
-          <button
-            type="button"
-            class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            :aria-expanded="showRaw"
-            @click="showRaw = !showRaw"
-          >
-            {{ showRaw ? 'Скрыть' : 'Показать' }} журнал ({{ outputs.length }})
-          </button>
+          <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div class="space-y-1">
+              <h2
+                id="sources-heading"
+                class="text-lg font-bold"
+              >
+                Материалы по фазам
+              </h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                Что вернула каждая отработанная фаза. Открывается в один клик, можно скачать .md.
+              </p>
+            </div>
+            <button
+              v-if="!devMode"
+              type="button"
+              class="inline-flex h-11 shrink-0 items-center rounded-full border bg-background px-4 text-sm text-muted-foreground hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              @click="openTechnical"
+            >
+              Технические детали
+            </button>
+          </div>
+
           <ul
-            v-if="showRaw"
-            class="space-y-3"
+            v-if="materialPhases.length > 0"
+            class="space-y-2"
           >
             <li
-              v-for="out in outputs"
+              v-for="out in materialPhases"
               :key="out.id"
-              class="rounded-xl bg-white/5 p-4"
+              class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl bg-surface p-3"
             >
-              <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="font-medium">{{ ROLE_LABELS[out.role] ?? out.role }}</span>
-                <span class="opacity-60">{{ fmtDate(out.createdAt) }}</span>
-                <span
-                  class="rounded-full px-2 py-0.5 text-xs"
-                  :class="out.formatValid ? 'bg-success-soft text-success' : 'bg-destructive/20 text-destructive'"
-                >
-                  {{ out.formatValid ? 'формат ок' : 'битый формат' }}
-                </span>
-                <span
-                  v-if="out.outdated"
-                  class="rounded-full bg-accent/20 px-2 py-0.5 text-xs"
-                >устарел</span>
-              </div>
-              <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-sans text-xs leading-5 opacity-80">{{ renderValue(out.output) }}</pre>
+              <span class="min-w-0 text-sm font-medium">{{ phaseTitle(out.role) }}</span>
+              <span class="flex items-center gap-3">
+                <span class="text-xs text-muted-foreground">{{ fmtDate(out.createdAt) }}</span>
+                <MaterialViewer
+                  :idea-id="ideaId"
+                  :role="out.role"
+                />
+              </span>
             </li>
           </ul>
+          <p
+            v-else
+            class="text-sm text-muted-foreground"
+          >
+            Материалов пока нет — ни одна фаза не завершилась с сохранённым выходом.
+          </p>
+
+          <template v-if="devMode">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+              <div class="space-y-1">
+                <h3 class="text-sm font-bold">
+                  Журнал вызовов — режим разработчика
+                </h3>
+                <p class="text-xs text-muted-foreground">
+                  Сырые выходы, id ролей и флаги формата. Владельцу это не нужно: выключается в «Настройках».
+                </p>
+              </div>
+              <button
+                type="button"
+                class="inline-flex h-11 shrink-0 items-center rounded-full border bg-background px-4 text-sm font-medium hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                :aria-expanded="showRaw"
+                @click="showRaw = !showRaw"
+              >
+                {{ showRaw ? 'Скрыть' : 'Показать' }} raw ({{ outputs.length }})
+              </button>
+            </div>
+            <ul
+              v-if="showRaw"
+              class="space-y-3"
+            >
+              <li
+                v-for="out in outputs"
+                :key="out.id"
+                class="rounded-xl bg-surface p-4"
+              >
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                  <span class="font-mono text-xs">{{ out.role }}</span>
+                  <span class="text-xs text-muted-foreground">{{ fmtDate(out.createdAt) }}</span>
+                  <span
+                    class="rounded-full px-2 py-0.5 text-xs"
+                    :class="out.formatValid ? 'bg-success-soft text-success' : 'bg-destructive/20 text-destructive'"
+                  >
+                    {{ out.formatValid ? 'формат ок' : 'битый формат' }}
+                  </span>
+                  <span
+                    v-if="out.outdated"
+                    class="rounded-full bg-accent/20 px-2 py-0.5 text-xs"
+                  >устарел</span>
+                </div>
+                <pre class="mt-2 max-h-64 overflow-auto rounded-lg bg-card p-3 font-mono text-[11px] leading-4">{{ renderValue(out.output) }}</pre>
+              </li>
+            </ul>
+          </template>
         </section>
       </template>
     </template>
