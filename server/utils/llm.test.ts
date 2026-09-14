@@ -45,6 +45,9 @@ describe('LLM клиент', () => {
     })
 
     it('выбрасывает ошибку если API ключ не настроен', async () => {
+      // Ключ ищется только по LLM_API_KEY (фолбэк на ROUTERAI убран: он тихо
+      // подсовывал чужой провайдеру чужой ключ). Гасим оба имени.
+      delete process.env.LLM_API_KEY
       delete process.env.ROUTERAI_API_KEY
 
       await expect(callLlm(TestSchema, { system: 'Тест', user: 'Тест' })).rejects.toThrow(LlmError)

@@ -32,6 +32,7 @@ export default defineConfig({
       DATABASE_URL:
         process.env.TEST_DATABASE_URL
         ?? 'postgres://postgres:postgres@localhost:5434/idea_factory_test',
+      LLM_API_KEY: localEnv.LLM_API_KEY ?? localEnv.ROUTERAI_API_KEY,
       ROUTERAI_API_KEY: localEnv.ROUTERAI_API_KEY,
     },
     // e2e/*.spec.ts — Playwright-тесты (pnpm e2e), не Vitest.

@@ -36,14 +36,17 @@ export function getLlmModel(): string {
   return envOr(ENV.LLM_MODEL, LLM_DEFAULT_MODEL)
 }
 
-/** Серверный только ключ. Пустая строка = «не настроен» (вызывающий отдаёт 503). */
+/**
+ * Серверный только ключ. Пустая строка = «не настроен» (вызывающий отдаёт 503).
+ *
+ * Фолбэк на ROUTERAI_API_KEY был УБРАН намеренно: он тихо подсовывал ключ одного
+ * провайдера в API другого, и вместо честного «ключа нет» прогон умирал на
+ * `401 Invalid api_key format` (замерено на публичном стенде 2026-09-14).
+ * ROUTERAI_API_KEY остаётся ключом транскрибации (server/utils/stt.ts) — это
+ * другой сервис и другая переменная.
+ */
 export function getLlmApiKey(): string {
-  const primary = ENV.LLM_API_KEY?.trim()
-  if (primary && primary.length > 0) {
-    return primary
-  }
-  // Имя-наследник: Dokploy и тесты знают только ROUTERAI_API_KEY.
-  return envOr(ENV.ROUTERAI_API_KEY, '')
+  return envOr(ENV.LLM_API_KEY, '')
 }
 
 /**

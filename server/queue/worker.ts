@@ -6,6 +6,7 @@ import type { CheckpointerHandle } from './checkpointer'
 import type { JobCheckpoint, JobRow, PrismaDb, StepExecutor } from './types'
 
 import { PIPELINE_VERSION } from '../../config/pipeline'
+import { ensureCheckpointerTables } from './checkpointer'
 import { claimNextJob, type ClaimOptions, initialCheckpoint } from './claim'
 import { getExecutor, hasOnlyFixtureExecutors } from './executors'
 import { createRun } from './run-protocol'
@@ -102,6 +103,13 @@ export class AnalysisWorker {
 
   /** Обработка одной задачи: граф пайплайна с чекпоинтами и контролем паузы/отмены */
   async executeJob(job: JobRow): Promise<JobOutcome> {
+    // Таблицы чекпоинтов создаёт LangGraph, а не наши миграции — и `migrate`-сервис
+    // на деплое считает их лишними и сносит (замер: `prisma db update` планирует
+    // 4 destructive operation «Drop table "checkpoints" …»). Поэтому убеждаемся,
+    // что они есть, перед КАЖДЫМ заданием: идемпотентно (CREATE TABLE IF NOT EXISTS),
+    // ~30 мс, и больше не важно, что раньше встанет — worker или migrate.
+    await ensureCheckpointerTables(this.opts.checkpointer)
+
     const graph = this.buildGraph()
     const cp: JobCheckpoint = job.checkpoint ?? initialCheckpoint(job.id)
     const config = { configurable: { thread_id: cp.thread_id } }

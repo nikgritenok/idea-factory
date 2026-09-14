@@ -521,6 +521,33 @@ describe('материалы фазы — записываются по мере
     expect((await activeOutputs(ideaId)).map(o => o.role).sort()).toEqual(['r1', 'r2', 'r3'])
   })
 
+  it('самоизлечивается, если таблицы чекпоинтов снесли (migrate на деплое)', { timeout: 15_000 }, async () => {
+    // Ровно то, что случилось на публичном стенде: `prisma db update` считает таблицы
+    // LangGraph лишними и роняет их (замер: 4 destructive operation «Drop table»).
+    // Проверка на живой БД: роняем и убеждаемся, что задание всё равно проходит.
+    const ideaId = await insertIdea('worker-таблицы-снесены')
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
+    expect(job).toBeDefined()
+
+    // Сырой SQL — через pg.Client, как в остальных местах этого файла: ORM контракта
+    // эти таблицы не знает, именно поэтому migrate их и сносит.
+    const client = new pg.Client({ connectionString: DB })
+    await client.connect()
+    try {
+      await client.query('drop table if exists checkpoint_writes cascade; drop table if exists checkpoint_blobs cascade; drop table if exists checkpoints cascade; drop table if exists checkpoint_migrations cascade')
+      expect(await makeWorker(counters(), mainCheckpointer).executeJob(job as JobRow)).toBe('done')
+      const tables = await client.query(
+        'select table_name from information_schema.tables where table_name like $1',
+        ['checkpoint%'],
+      )
+      expect(tables.rows).toHaveLength(4)
+    }
+    finally {
+      await client.end()
+    }
+  })
+
   it('повторный прогон не оставляет двух активных записей одной фазы', { timeout: 20_000 }, async () => {
     const c = counters()
     const ideaId = await insertIdea('worker-перезапись-фазы')
