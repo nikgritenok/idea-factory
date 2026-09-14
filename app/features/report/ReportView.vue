@@ -186,7 +186,7 @@ const generalSections = computed(() =>
             :class="report.recommendation === 'develop' ? 'bg-success-soft' : 'bg-surface-cream'"
           >
             <p class="text-[13px] font-medium text-muted-foreground">
-              Рекомендация
+              Вывод ИИ-критика
             </p>
             <p class="mt-1 text-xl font-bold">
               {{ RECOMMENDATION_LABELS[report.recommendation ?? ''] ?? report.recommendation ?? '—' }}

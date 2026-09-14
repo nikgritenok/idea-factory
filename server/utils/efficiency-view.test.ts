@@ -16,7 +16,7 @@ function row(overrides: { ci?: { lower: number, upper: number }, recommendation?
         recommendation: overrides.recommendation ?? 'develop',
         rules: [
           { action: 'insufficient_data', rule: 'Недостаточно данных', triggered: false },
-          { action: 'postpone', rule: 'Эффект 3,7 мин < порога 0,5 мин', triggered: false },
+          { action: 'postpone', rule: 'Эффект 3.72 мин < порога 0.5 мин', triggered: false }, // формат decision.ts (toFixed)
           { action: 'validate_first', rule: 'Доверительный интервал включает «без изменений» (CI lower ≤ 0)', triggered: ci.lower <= 0 },
         ],
         stopFactor: null,
@@ -100,6 +100,12 @@ describe('Карточка эффективности (view-модель сер�
     // шаблоном: обычное `'10 000'` через toContain не совпадёт, и это не баг кода.
     expect(view.methodLine).toMatch(/bootstrap 10\s000 ресемплирований/u)
     expect(view.methodLine).toContain('не ИИ')
+  })
+
+  it('числа внутри строк решения — с запятой, как весь отчёт', () => {
+    const view = buildEfficiencyView(row()) as EfficiencyView
+    expect(view.decision?.threshold).toBe('Эффект 3,72 мин < порога 0,5 мин')
+    expect(view.decision?.threshold).not.toMatch(/\d\.\d/)
   })
 
   it('строка без result.decision/result не превращается в карточку из прочерков', () => {

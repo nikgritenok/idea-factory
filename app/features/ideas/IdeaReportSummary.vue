@@ -89,12 +89,15 @@ const shown = computed(() => report.value !== null)
     </div>
 
     <div class="flex flex-wrap items-center gap-3">
+      <!-- Вердикт критика (LLM) и вердикт расчёта (детерминированный) — разные
+           основания; без подписи под ними они читаются как противоречие. -->
       <span
         class="rounded-full px-4 py-2 text-[15px] font-bold"
         :class="badgeClass"
       >
         {{ recommendationLabel }}
       </span>
+      <span class="text-xs text-muted-foreground">вывод ИИ-критика</span>
       <span class="text-sm text-muted-foreground">
         Оценка: <span class="font-medium text-foreground">{{ report?.score ?? '—' }} / 10</span>
       </span>
@@ -112,6 +115,14 @@ const shown = computed(() => report.value !== null)
       </p>
       <p class="text-sm text-muted-foreground">
         Экономия на объёме: {{ efficiencyLine.volume }}
+      </p>
+      <p
+        v-if="calculation?.view?.decision"
+        class="text-sm"
+      >
+        Вердикт расчёта:
+        <span class="font-medium">{{ calculation.view.decision.label }}</span>
+        <span class="text-muted-foreground">(детерминированный, выше — вывод ИИ)</span>
       </p>
     </div>
 

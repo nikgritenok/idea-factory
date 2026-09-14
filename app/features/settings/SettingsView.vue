@@ -37,7 +37,7 @@ onMounted(syncDevMode)
       >
         Интерфейс
       </h2>
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex min-h-11 flex-wrap items-center justify-between gap-3">
         <div class="min-w-0 space-y-0.5">
           <Label
             for="dev-mode-switch"

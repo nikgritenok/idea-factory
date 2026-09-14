@@ -107,7 +107,7 @@ const headline = computed(() => {
       class="space-y-3 rounded-xl border p-4"
     >
       <div class="flex flex-wrap items-center gap-3">
-        <span class="text-sm text-muted-foreground">Решение:</span>
+        <span class="text-sm text-muted-foreground">Решение по расчёту:</span>
         <span
           class="rounded-full px-4 py-2 text-[15px] font-bold"
           :class="badgeClass"

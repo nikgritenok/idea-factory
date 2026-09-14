@@ -67,7 +67,10 @@ function priorityClasses(priority: string): string {
         </p>
 
         <div class="flex flex-wrap items-center gap-1.5">
+          <!-- Чип этапа не показываем, пока есть плашка прогона: «В работе» +
+               «Идёт анализ · План работы» — это одна и та же мысль дважды. -->
           <span
+            v-if="!plan.plate"
             class="rounded-full px-2.5 py-0.5 text-[13px] font-medium"
             :class="stageClasses(idea.funnelStage)"
           >

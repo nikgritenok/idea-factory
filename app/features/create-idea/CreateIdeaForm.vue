@@ -81,7 +81,7 @@ async function handleSubmit(): Promise<void> {
               <button
                 type="button"
                 aria-label="Подробнее о том, что происходит с идеей"
-                class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-foreground transition-colors hover:bg-surface-tint"
+                class="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-foreground transition-colors hover:bg-surface-tint"
               >
                 <Icon
                   name="lucide:circle-help"
@@ -142,7 +142,7 @@ async function handleSubmit(): Promise<void> {
               <button
                 type="button"
                 aria-label="Начать голосовой ввод"
-                class="inline-flex size-9 items-center justify-center rounded-full bg-surface text-foreground transition-colors hover:bg-surface-tint"
+                class="inline-flex size-11 items-center justify-center rounded-full bg-surface text-foreground transition-colors hover:bg-surface-tint"
                 @click="handleMic"
               >
                 <Icon name="lucide:mic" class="size-4" />
@@ -255,7 +255,7 @@ async function handleSubmit(): Promise<void> {
               type="button"
               role="radio"
               :aria-checked="priority === opt.value"
-              class="relative rounded-full px-4 py-1.5 text-label-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="relative inline-flex min-h-11 items-center rounded-full px-4 py-1.5 text-label-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               :class="priority === opt.value
                 ? 'font-bold text-primary ring-1 ring-inset ring-primary'
                 : 'font-medium text-foreground'"

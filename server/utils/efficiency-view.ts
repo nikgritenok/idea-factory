@@ -122,6 +122,15 @@ function toneOf(recommendation: string): EfficiencyView['badgeTone'] {
 }
 
 /**
+ * Числа внутри человеческих строк решения приходят из decision-модуля с точкой
+ * (`3.57 мин`), а весь отчёт — с запятой. Правим только отображение: строки
+ * генерируются расчётом, и менять их формат на сервере смысла нет.
+ */
+function localizeNumbers(text: string): string {
+  return text.replaceAll(/\d+\.\d+/g, m => m.replace('.', ','))
+}
+
+/**
  * View-модель из строки `calculations`. null — если строка на расчёт не похожа:
  * UI честно скажет «данных нет» вместо карточки из прочерков.
  */
@@ -151,7 +160,7 @@ export function buildEfficiencyView(row: RawCalcRow): EfficiencyView | null {
 
   const recommendation = decision.recommendation ?? ''
   const rules = decision.rules ?? []
-  const triggeredRules = rules.filter(r => r.triggered).map(r => r.rule ?? '').filter(Boolean)
+  const triggeredRules = rules.filter(r => r.triggered).map(r => localizeNumbers(r.rule ?? '')).filter(Boolean)
   // Порог решения — то правило-условие, которое НЕ сработало (оно и описывает рамку)
   const thresholdRule = rules.find(r => !r.triggered && /порог|ниже|меньше/i.test(r.rule ?? ''))
 
@@ -183,7 +192,7 @@ export function buildEfficiencyView(row: RawCalcRow): EfficiencyView | null {
       ? {
           label: RECOMMENDATION_LABELS[recommendation] ?? fieldValueLabel(recommendation),
           recommendation,
-          threshold: thresholdRule?.rule ?? 'Порог: эффект должен превышать базовую ошибку процесса',
+          threshold: thresholdRule ? localizeNumbers(thresholdRule.rule ?? '') : 'Порог: эффект должен превышать базовую ошибку процесса',
           triggeredRules,
         }
       : null,
