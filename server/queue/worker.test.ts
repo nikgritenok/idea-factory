@@ -472,3 +472,73 @@ describe('цикл воркера start/stop', () => {
     expect(done).toBe(true)
   })
 })
+
+describe('материалы фазы — записываются по мере выполнения (TZ §4)', () => {
+  async function activeOutputs(ideaId: string): Promise<Array<{ outdated: boolean, role: string }>> {
+    return await db.orm.public.AgentOutputs
+      .select('outdated', 'role')
+      .where(f => f.ideaId.eq(ideaId))
+      .where(f => f.outdated.eq(false))
+      .all()
+  }
+
+  /** Отдельный поллер: `waitFor` в этом файле ждёт синхронный предикат, async-проверка
+   * прошла бы мгновенно (Promise всегда truthy) и тест стал бы ложно-зелёным. */
+  async function waitActiveOutputs(ideaId: string, min: number, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      const rows = await activeOutputs(ideaId)
+      if (rows.length >= min) {
+        return rows
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`активных записей фаз меньше ${min} за ${timeoutMs} мс`)
+      }
+      await new Promise(r => setTimeout(r, 25))
+    }
+  }
+
+  it('выход шага виден в agent_outputs до конца прогона', { timeout: 15_000 }, async () => {
+    const c = counters()
+    const gate = openBarrier()
+    const worker = makeWorker(c, mainCheckpointer, { t2: barrierExec(gate, 's2') })
+    const ideaId = await insertIdea('worker-материалы-вовремя')
+    await enqueueIdeaAnalysis(db, ideaId)
+    const job = await claimNextJob(db)
+    expect(job).toBeDefined()
+
+    // s1 уже отработал, s2 держим на барьере: прогон НЕ завершён.
+    const running = worker.executeJob(job as JobRow)
+    await waitActiveOutputs(ideaId, 1)
+
+    // До переноса записи в makeNode здесь был бы пустой список — ровно тот случай,
+    // из-за которого проверяющий не увидел работу агентов: прогон упал на середине,
+    // и отработавшие фазы исчезли вместе с ним.
+    expect((await activeOutputs(ideaId)).map(o => o.role)).toEqual(['r1'])
+
+    gate.release()
+    expect(await running).toBe('done')
+    expect((await activeOutputs(ideaId)).map(o => o.role).sort()).toEqual(['r1', 'r2', 'r3'])
+  })
+
+  it('повторный прогон не оставляет двух активных записей одной фазы', { timeout: 20_000 }, async () => {
+    const c = counters()
+    const ideaId = await insertIdea('worker-перезапись-фазы')
+    await enqueueIdeaAnalysis(db, ideaId)
+    await makeWorker(c, mainCheckpointer).executeJob(await claimNextJob(db) as JobRow)
+    expect((await activeOutputs(ideaId)).length).toBe(3)
+
+    await enqueueIdeaAnalysis(db, ideaId)
+    await makeWorker(c, mainCheckpointer).executeJob(await claimNextJob(db) as JobRow)
+
+    const all = await db.orm.public.AgentOutputs
+      .select('outdated', 'role')
+      .where(f => f.ideaId.eq(ideaId))
+      .all() as unknown as Array<{ outdated: boolean, role: string }>
+
+    // История прежнего прогона остаётся (устаревшей, но доступной), а активной
+    // остаётся ровно одна запись каждой фазы — иначе «материалы» показывают лотерею.
+    expect(all.length).toBe(6)
+    expect(all.filter(o => !o.outdated).map(o => o.role).sort()).toEqual(['r1', 'r2', 'r3'])
+  })
+})

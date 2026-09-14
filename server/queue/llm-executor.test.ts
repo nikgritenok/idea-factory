@@ -13,6 +13,25 @@ vi.mock('../utils/llm', () => ({
   },
 }))
 
+/**
+ * Минимальный двойник `ctx.db` под цепочку Prisma 8: `.select().where().first()`.
+ * Нужен ровно один метод — чтение транскрипта идеи; остального исполнитель не касается.
+ */
+function fakeDb(sourceTranscript: string) {
+  // async + await: правило требует, чтобы функция, возвращающая промис, была async,
+  // а `ai-guard` не терпит `async` без `await` — вот такой форме подчиняются обе.
+  const first = async () => await Promise.resolve({ sourceTranscript })
+  return {
+    orm: {
+      public: {
+        Ideas: {
+          select: () => ({ where: () => ({ first }) }),
+        },
+      },
+    },
+  } as never
+}
+
 describe('LLM-исполнитель', () => {
   it('создаёт исполнителя для роли orchestrator', async () => {
     const { callLlm } = await import('../utils/llm')
@@ -30,12 +49,16 @@ describe('LLM-исполнитель', () => {
 
     const executor = createLlmExecutor('orchestrator')
     const ctx = {
-      db: {} as never,
+      // orchestrator — первый шаг, `idea_analysis` в state ещё нет, поэтому
+      // production-путь читает транскрипт из БД (llm-executor.ts:71). Пустой `db`
+      // здесь был стабом из времени, когда чтения не было; `state.transcript` —
+      // ключа с таким именем в PipelineState нет вообще (state = stepResults).
+      db: fakeDb('Тестовая идея для анализа'),
       ideaId: 'test-idea-id',
       jobId: 'test-job-id',
       signal: new AbortController().signal,
       sql: {} as never,
-      state: { transcript: 'Тестовая идея для анализа' },
+      state: {},
       step: { id: 'orchestrator_plan', role: 'orchestrator' },
     }
 

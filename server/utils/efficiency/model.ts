@@ -102,9 +102,19 @@ export function computeVariant(
   p: ModelParams,
   seed: number,
 ): VariantResult {
-  const baseTimes = ds.rows.map((r: TicketRow) => r.manualMinutes)
+  // «Валидная база» определяется здесь ровно как в meanBase (finite и > 0), иначе
+  // точечная оценка bootstrap и «средняя база» в отчёте расходились бы.
+  const baseTimes = ds.rows
+    .map((r: TicketRow) => r.manualMinutes)
+    .filter(v => Number.isFinite(v) && v > 0)
   const vm = variantMinutes(p)
-  const bootstrap = bootstrapMeanDiff(baseTimes, [vm], seed)
+  // Вариант — константа по формуле, но bootstrap'у нужна выборка: с `[vm]` из одного
+  // элемента срабатывал guard «n < 2» и CI всегда возвращался вырожденным [0, 0],
+  // поэтому правило «CI включает без изменений» срабатывало для ЛЮБОЙ идеи и
+  // рекомендация была структурно приземлена в validate_first. Ресемплинг константы
+  // даёт разброс только по базе — это и есть намерение модели («base против варианта»).
+  const variantTimes = new Array<number>(baseTimes.length).fill(vm)
+  const bootstrap = bootstrapMeanDiff(baseTimes, variantTimes, seed)
 
   return {
     bootstrap,
@@ -122,10 +132,9 @@ export function computeVariant(
 export function computeScenarios(
   ds: GeneratedDataset,
   base: ModelParams,
-  // Сценарии детерминированы самой конструкцией overrides — seed здесь не участвует.
-  // Параметр оставлен: он часть сигнатуры расчётного модуля (TZ §5) и вызывается из
-  // computeEfficiency; убирать его — менять публичный API расчёта.
-  _seed: number,
+  // CI сценариев считается bootstrap'ом, поэтому seed участвует и здесь: bounds
+  // воспроизводимы ровно при том же seed, который сохранён вместе с результатом (TZ §5).
+  seed: number,
 ): ScenarioResult[] {
   const variants: Array<{ name: ScenarioResult['name'], overrides: Partial<ModelParams> }> = [
     { name: 'base', overrides: {} },
@@ -141,15 +150,17 @@ export function computeScenarios(
 
   return variants.map(({ name, overrides }) => {
     const p = { ...base, ...overrides }
-    const vm = variantMinutes(p)
-    const effect = meanBase(ds) - vm
+    // Сценарий считается тем же computeVariant, что и заголовок: раньше ci
+    // подставлялся точечной оценкой ({lower: effect, upper: effect}), и «95% CI:
+    // 3.57–3.57» в UI означало бы либо сломанную статистику, либо подделку.
+    const v = computeVariant(ds, p, seed)
     return {
-      ci: { lower: effect, upper: effect },
-      effectPerTicket: effect,
-      effectVolumeHours: (effect * p.monthlyVolume) / 60,
+      ci: v.bootstrap.ci,
+      effectPerTicket: v.effectPerTicket,
+      effectVolumeHours: v.effectVolumeHours,
       name,
       params: p,
-      quality: p.aiCorrectRate,
+      quality: v.quality,
     }
   })
 }

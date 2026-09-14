@@ -18,6 +18,17 @@
   "compilerOptions": {
     "module": "preserve",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    // Алиасы Nuxt. В `.nuxt/tsconfig.server.json` они есть, но tsx ищет конфиг от cwd
+    // и по project references не идёт, поэтому `pnpm worker` падал на
+    // ERR_MODULE_NOT_FOUND: Cannot find package '~~'. Прогон воркера из CLI — единственный
+    // способ проверить очередь вне Nitro, так что резолвер здесь обязателен.
+    "paths": {
+      "~~": ["."],
+      "~~/*": ["./*"],
+      "~": ["./app"],
+      "~/*": ["./app/*"]
+    },
     "resolveJsonModule": true,
     "types": [
       "node"

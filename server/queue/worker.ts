@@ -222,9 +222,10 @@ export class AnalysisWorker {
       return 'cancelled'
     }
 
-    // Граф дошёл до конца — задача выполнена
-    // Сохраняем результаты шагов в agent_outputs и reports (персистентность для UI)
-    await this.persistResults(job.ideaId, runId, cp)
+    // Граф дошёл до конца — задача выполнена.
+    // Материалы шагов уже в agent_outputs (пишутся по мере выполнения), здесь
+    // остаётся только детерминированная сборка отчёта.
+    await this.persistReport(job.ideaId, cp)
 
     // Завершаем прогон как completed
     if (runId) {
@@ -235,44 +236,80 @@ export class AnalysisWorker {
       .where(f => f.id.eq(job.id))
       .update({
         checkpoint: { ...cp, graph_started: true, last_step: completedStep } satisfies JobCheckpoint,
+        // error чистим обязательно: текст предыдущей попытки (например, 401 до
+        // смены ключа) оставался в строке и после успешного завершённого прогона,
+        // а карточкаideas показывала красный «Прогон остановился» над готовым отчётом.
+        error: null,
         finishedAt: new Date().toISOString(),
         status: 'done',
       })
     await this.db.orm.public.Ideas
       .where(f => f.id.eq(job.ideaId))
       .update({
+        // executionStatus обязан уйти из 'running' вместе с funnelStage: без этого
+        // у идеи навсегда оставалось «идёт анализ» (в UI это видно на экране прогона
+        // и в `/api/jobs/[id]`). У enum нет терминального значения, «не исполняется»
+        // здесь = 'paused' — так же делают пути паузы, отмены и реплея ниже.
+        executionStatus: 'paused',
         funnelStage: 'decision',
         updatedAt: new Date().toISOString(),
       })
     return 'done'
   }
 
-  /** Сохраняет результаты шагов пайплайна в agent_outputs и reports (UI персистентность) */
-  private async persistResults(ideaId: string, runId: string | undefined, cp: JobCheckpoint): Promise<void> {
+  /**
+   * Выход шага сохраняется сразу, как шаг отработал — а не в конце прогона.
+   *
+   * Пока этого не было, карточка идеи не показывала материалы, пока прогон не
+   * доходил до последнего шага, а прогон, упавший на середине, не оставлял НИЧЕГО:
+   * именно поэтому проверяющий увидел пустой «ход работы» там, где четыре фазы
+   * уже отработали. Плюс персестарт по retry-step (replay) писал отчёт только
+   * вместе с полным `persistResults`, которого на его пути не было.
+   *
+   * Устаревшим становится только ЭТА роль: материалы предыдущего прогона остаются
+   * видны, пока шаг не переотработан, — иначе при сбое нового прогона пользователь
+   * теряет то, что уже было получено.
+   */
+  private async persistStepOutput(
+    ideaId: string,
+    runId: string | undefined,
+    step: PipelineStep,
+    result: unknown,
+  ): Promise<void> {
+    const role = step.role ?? step.id
     try {
-      // Помечаем старые outputs как outdated
       await this.db.orm.public.AgentOutputs
         .where(f => f.ideaId.eq(ideaId))
+        .where(f => f.role.eq(role))
         .update({ outdated: true })
 
+      await this.db.orm.public.AgentOutputs.create({
+        formatValid: true,
+        ideaId,
+        output: JSON.parse(JSON.stringify(result)),
+        role,
+        runId: runId ?? null,
+      })
+    }
+    catch (err) {
+      // Сбой записи материала не должен валить прогон: шаги уже оплачены LLM.
+      // Стек сохраняем текстом — широкого события здесь нет, воркер вне HTTP-запроса.
+      log.error({
+        event: 'persist_step_failed',
+        error: err instanceof Error ? err.stack ?? err.message : String(err),
+        step: { id: step.id, role },
+      })
+    }
+  }
+
+  /** Отчёт собирается из шага критика; материалы к этому моменту уже сохранены по шагам. */
+  private async persistReport(ideaId: string, cp: JobCheckpoint): Promise<void> {
+    try {
       // Читаем финальное состояние из чекпоинтера
       const graph = this.buildGraph()
       const config = { configurable: { thread_id: cp.thread_id } }
       const snapshot = await graph.getState(config)
       const stepResults = (snapshot.values as { stepResults?: Record<string, unknown> })?.stepResults ?? {}
-
-      // Сохраняем каждый шаг в agent_outputs
-      for (const step of this.opts.steps) {
-        const result = stepResults[step.id]
-        if (result === undefined) continue
-        await this.db.orm.public.AgentOutputs.create({
-          formatValid: true,
-          ideaId,
-          output: JSON.parse(JSON.stringify(result)),
-          role: step.role ?? step.id,
-          runId: runId ?? null,
-        })
-      }
 
       // Собираем отчёт из critic_review (финальный шаг)
       const criticResult = stepResults['critic_review'] as Record<string, unknown> | undefined
@@ -364,10 +401,15 @@ export class AnalysisWorker {
     }
 
     const lastStep = this.opts.steps.at(-1)?.id ?? null
+    // Путь реплея обязан собрать отчёт сам: раньше он только помечал задачу done,
+    // и «Продолжить прогон» после сбоя не оставлял ни отчёта, ни материалов.
+    await this.persistReport(job.ideaId, { ...cp, graph_started: true, last_step: lastStep })
     await this.db.orm.public.QueueJobs
       .where(f => f.id.eq(job.id))
       .update({
         checkpoint: { ...cp, graph_started: true, last_step: lastStep } satisfies JobCheckpoint,
+        // См. выше: завершённый прогон не имеет права нести ошибку прошлой попытки.
+        error: null,
         finishedAt: new Date().toISOString(),
         status: 'done',
       })
@@ -410,6 +452,8 @@ export class AnalysisWorker {
         step,
         this.opts.retryDelayMs,
       )
+      // Материал фазы становится доступен сразу — не дождавшись конца прогона.
+      await this.persistStepOutput(state.ideaId, state.runId, step, output.output)
       return { stepResults: { [step.id]: output.output } }
     }
   }

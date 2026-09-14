@@ -2,8 +2,7 @@ import type { z } from 'zod'
 
 import { log } from 'evlog'
 
-const ROUTERAI_BASE = 'https://routerai.ru/api/v1'
-export const LLM_MODEL = 'z-ai/glm-5.3-flash'
+import { getLlmApiKey, getLlmBaseUrl, getLlmModel } from '../../config/llm'
 
 export interface LlmCallOptions {
   /** Максимум токенов в ответе (по умолчанию 4096) */
@@ -45,7 +44,7 @@ export class LlmError extends Error {
  * Возвращает сырой текст ответа модели.
  */
 async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usage?: LlmCallResult<unknown>['usage'], cost?: number }> {
-  const apiKey = process.env.ROUTERAI_API_KEY
+  const apiKey = getLlmApiKey()
   if (!apiKey) {
     throw new LlmError('LLM-ключ не настроен на сервере', 503)
   }
@@ -56,7 +55,7 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
       { content: options.system, role: 'system' },
       { content: options.user, role: 'user' },
     ],
-    model: LLM_MODEL,
+    model: getLlmModel(),
     // Строгий JSON-режим: модель ОБЯЗАНА вернуть JSON по схеме из system prompt
     response_format: { type: 'json_object' },
     structured_outputs: true,
@@ -69,7 +68,7 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
   const startTime = Date.now()
   let res: Response
   try {
-    res = await fetch(`${ROUTERAI_BASE}/chat/completions`, {
+    res = await fetch(`${getLlmBaseUrl()}/chat/completions`, {
       body: JSON.stringify(body),
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -119,7 +118,7 @@ async function callLlmRaw(options: LlmCallOptions): Promise<{ text: string, usag
     log.info({
       durationMs,
       event: 'llm_call',
-      model: LLM_MODEL,
+      model: getLlmModel(),
       step: options.step,
       temperature: options.temperature ?? 0.3,
       tokens: usage.totalTokens,

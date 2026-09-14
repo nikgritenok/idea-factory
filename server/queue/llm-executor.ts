@@ -1,12 +1,13 @@
 import type { StepContext, StepResult } from './types'
 
+import { getLlmModel } from '../../config/llm'
 import { getRoleConfig } from '../../config/roles'
 import { callLlm } from '../utils/llm'
 import { withRunCall } from './run-protocol'
 
 /**
  * LLM-исполнитель шагов пайплайна.
- * Вызывает реальный LLM (z-ai/glm-5.3-flash) с валидацией ответа.
+ * Вызывает реальный LLM (модель — из config/llm.ts, не отсюда) с валидацией ответа.
  * Записывает каждый вызов в run_calls через протокол прогона (TZ §9).
  *
  * Паттерн: role ID из pipeline.ts → конфиг роли → промпт → LLM → Zod-валидация → результат.
@@ -117,7 +118,11 @@ export function createLlmExecutor(roleId: string) {
     }
 
     const result: Awaited<ReturnType<typeof callFn>> = ctx.db && runId
-      ? (await withRunCall(runId, 'llm', 'z-ai/glm-5.3-flash', request, callFn))
+      // component = шаг, а не голое «llm»: иначе в журнале вызовов фазы
+      // неразличимы, и понять, сколько длилась каждая, нельзя.
+      // Версия модели берётся из конфига: хардкод `z-ai/glm-5.3-flash` пережил
+      // смену провайдера и начал писать в журнал несуществующую модель.
+      ? (await withRunCall(runId, `llm:${ctx.step.id}`, getLlmModel(), request, callFn))
       : (await callFn())
 
     return {
