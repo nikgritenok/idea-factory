@@ -2,18 +2,26 @@
 
 Turns a raw idea, typed or dictated, into a report someone can decide on: what the idea is, who it is for, what it would change in numbers, where it breaks, and whether to build it, test it first, or drop it.
 
-Seven stages run in order. Five are LLM roles: orchestrator, idea parser, market and audience, strategist, critic. The other two are plain code. The effect calculation and the report assembly are deterministic, so the numbers in the report never come from a model's prose.
+## How it works
 
-Stages, limits and prompts live in config, not in the UI, so the pipeline changes without touching components. A malformed model answer fails its Zod contract and never reaches the report silently.
+Seven stages run in order. Five are LLM roles: orchestrator, idea parser, market and audience, strategist, critic. Two are plain code: the effect calculation and the report assembly. The numbers never come from a model's prose.
 
-## Stack
+Stages, prompts and limits live in `config/`, not in the UI, so the pipeline changes without touching components. Every model answer is validated against a Zod contract, and a malformed one fails its step instead of leaking into the report.
 
-Nuxt 4 (Vue 3, Nitro) and TypeScript, PostgreSQL 16 with Prisma 8, a Postgres-backed queue with LangGraph.js (StateGraph, checkpoints in Postgres), any OpenAI-compatible LLM provider, STT through routerai.ru, Zod on every boundary, Vitest and Playwright, Docker.
+## Workflow
 
-## Run
+1. Create an idea by text or by voice. Audio goes through `POST /api/transcribe` first.
+2. Start the analysis. The job enters a Postgres-backed queue, and `GET /api/jobs/:id/stream` pushes progress over SSE, so the page does not poll.
+3. Read the report at `GET /api/ideas/:id/report`. Calculations, stage outputs and the critic's verdict sit on their own endpoints next to it.
+
+A running job can be paused, resumed, cancelled, or retried from a chosen step. That matters when a provider rate-limits the fifth stage and you would rather not pay for the first four again.
+
+## Quick start
+
+Node LTS, pnpm, and Docker for the database.
 
 ```bash
-cp .env.example .env      # model keys, STT key
+cp .env.example .env      # LLM key, STT key, validator URL
 docker compose up -d db   # PostgreSQL on 5433
 pnpm install
 pnpm db:migrate
@@ -21,323 +29,56 @@ pnpm dev                  # http://localhost:3000
 pnpm worker               # queue worker, separate process
 ```
 
-## Structure
+There is no hosted demo: the pipeline needs model keys and a speech-to-text account.
 
-```
-app/                 Nuxt frontend
-server/api/          REST API: ideas, jobs, transcribe, health
-server/queue/        Postgres queue, LangGraph worker, step executors
-server/utils/        db, LLM client, STT, validator client, efficiency/
-shared/              Zod schemas, stage names and field labels
-config/              pipeline, roles, LLM and STT components
-services/validator/  separate container that checks report rules
-src/prisma/          database contract
-```
+## Configuration
 
-The Russian documentation below is the full one: how to read the report, what the effect calculation counts and what it does not, limits, data access, the glossary, API, deploy and commands.
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | PostgreSQL connection |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | yes | database container |
+| `LLM_API_KEY` | yes | model provider used for generation |
+| `LLM_BASE_URL`, `LLM_MODEL` | no | any OpenAI-compatible endpoint, defaults in `config/llm.ts` |
+| `ROUTERAI_API_KEY` | yes | speech to text, a separate service |
+| `VALIDATOR_URL` | yes | rules microservice, `http://validator:3001` |
+| `WORKER_MODE` | no | `true` makes the process drain the queue |
+| `LANGSMITH_API_KEY`, `LANGSMITH_TRACING`, `LANGSMITH_PROJECT` | no | tracing of model calls |
+| `APP_ENV` | no | `production` or `development` |
 
----
+## API
 
-# Документация на русском
+| Area | Endpoints |
+|---|---|
+| Ideas | `GET, POST /api/ideas`, `GET, PATCH, DELETE /api/ideas/:id`, `POST /api/ideas/:id/run`, `POST /api/ideas/:id/mvp` |
+| Results | `GET /api/ideas/:id/{report,calculations,runs,outputs,latest-job}`, `GET /api/ideas/:id/phases/:role/materials` |
+| Jobs | `GET /api/jobs/:id`, `GET /api/jobs/:id/stream`, `POST /api/jobs/:id/{pause,resume,cancel,retry-step}`, `PATCH /api/jobs/:id/priority` |
+| Other | `POST /api/transcribe`, `GET /api/health`, `GET /docs/:name` |
 
-## «Фабрика идей»
+Errors use one shape: `{ status, message, data: { code, why, fix } }`. `/api/v1` is reserved for a future breaking change.
 
-Сервис, который превращает сырую идею — набранную текстом или надиктованную голосом — в структурированный отчёт с расчётом потенциального эффекта и рекомендацией: развивать, сначала проверить, отложить или отклонить.
+## When to use it
 
-Пользователь описывает идею ИИ-решения → сервис создаёт карточку и ставит её в очередь → несколько ИИ-«ролей» (аналитики, стратег, критик) исследуют идею по очереди → детерминированный модуль считает потенциальный эффект в цифрах → критик ищет слабые места и стоп-факторы → на выходе отчёт по одной ссылке, который можно показать проверяющему.
+A team that collects ideas and wants a consistent first pass: the same questions asked every time, the arithmetic done in code, and the reasoning written down where it can be argued with. The report is aimed at a person who has to say yes or no, not at a market research team.
 
-Документация рассчитана в первую очередь на не-технического читателя. Техническая часть сжата и лежит в конце.
+## Limitations
 
----
+- The quality of the qualitative stages depends entirely on the model behind `LLM_MODEL`.
+- The effect calculation is a model of the effect, not a forecast. The report prints its assumptions and shows how sensitive the result is to them.
+- One idea per run, no batch mode.
+- Speech to text is a paid third-party service, so voice input needs an account.
 
-### Содержание
+## Stack
 
-- [Как это работает: путь идеи](#как-это-работает-путь-идеи)
-- [Экраны сервиса](#экраны-сервиса)
-- [Как пользоваться](#как-пользоваться)
-- [Отчёт: из чего состоит и как читать](#отчёт-из-чего-состоит-и-как-читать)
-- [Расчёт эффекта: что считается и насколько ему можно верить](#расчёт-эффекта-что-считается-и-насколько-ему-можно-верить)
-- [Правила и ограничения](#правила-и-ограничения)
-- [Данные, доступы и безопасность](#данные-доступы-и-безопасность)
-- [Словарик](#словарик)
-- [Для инженеров](#для-инженеров)
+Nuxt 4 (Vue 3, Nitro) and TypeScript, PostgreSQL 16 with Prisma 8, a Postgres-backed queue with LangGraph.js (StateGraph, checkpoints in Postgres), Zod on every boundary, Vitest and Playwright, Docker.
 
----
+## Documentation
 
-### Как это работает: путь идеи
+[`docs/ru.md`](docs/ru.md) is the full documentation in Russian: how to read the report, what the effect calculation counts and what it ignores, limits, data access and security, the glossary, the API reference and deploy steps.
 
-#### Этапы анализа
+## Contributing
 
-Идея проходит через 7 этапов. За каждым стоит отдельная «роль» — настроенный ИИ-агент со своим заданием, лимитами и проверкой формата ответа (битый ответ модели в отчёт молча не попадёт). Состав этапов и параметры задаются в конфиге, а не в коде интерфейса — их видно на экране «Настройки».
+Issues and pull requests are welcome. Run the test suite before opening a PR.
 
-| № | Этап | Что делает | Что получается |
-|---|------|------------|----------------|
-| 1 | Оркестратор | Составляет план анализа: какие вызовы, в каком порядке, с какими лимитами | План прогона |
-| 2 | Разбор идеи | Превращает сырой текст в структуру: суть, проблема, аудитория, ценность, допущения | Заполненная карточка |
-| 3 | Рынок и аудитория | Ищет конкурентов и альтернативы, строит прото-персоны, сегменты и возражения | Обзор рынка и аудитории |
-| 4 | Стратег-аналитик | Строит сценарии развития и предлагает, что и в каком порядке проверять | Варианты развития, приоритет эксперимента |
-| 5 | Расчёт эффекта | Считает эффект программно, детерминированным кодом, а не ИИ «на словах» — см. [отдельный раздел](#расчёт-эффекта-что-считается-и-насколько-ему-можно-верить) | Числа: формула, интервал, сценарии |
-| 6 | Критик | Ищет слабые места, стоп-факторы, выносит рекомендацию | Список рисков и рекомендация |
-| 7 | Редактор отчёта | Собирает всё в один документ (детерминированная сборка, без ИИ) | Готовый отчёт по одной ссылке |
+## License
 
-#### Стадии воронки
-
-Каждая идея в любой момент находится на одной из стадий воронки:
-
-| Стадия | Что означает |
-|--------|--------------|
-| Черновик | Идея создана, анализ ещё не запускался |
-| В очереди | Идея поставлена в очередь и ждёт своей очереди на обработку |
-| Исследование | Идут этапы разбора, рынка и стратегии |
-| Критическая оценка | Идёт проверка критиком |
-| Решение | Отчёт собран, есть рекомендация |
-| MVP в работе / MVP готов | Для одной «сквозной» идеи — доведение до работающего минимального продукта |
-| Архив | Идея убрана из воронки; архивирование освобождает место в очереди |
-
-Отдельно от воронки есть технический статус текущего шага: идёт / на паузе / ошибка / ожидает данных. Он показывает состояние выполнения, а не положение идеи в воронке: пауза на любом этапе не создаёт новых стадий.
-
----
-
-### Экраны сервиса
-
-| Экран | Адрес | Что здесь можно сделать |
-|-------|-------|------------------------|
-| Воронка | `/` | Доска идей: карточки, приоритеты, стадии, очередь. Запуск анализа, архивирование |
-| Новая идея | `/ideas/new` | Ввод текстом или запись голоса (с индикатором записи и расшифровкой), выбор приоритета |
-| Карточка идеи | `/ideas/:id` | Исходная идея, разбор по полям, история версий, материалы каждого этапа, запуск/пауза/продолжение |
-| Ход работы | в карточке | Какой этап сейчас занят, что завершено, почему остановка — обновляется в реальном времени |
-| Отчёт | `/ideas/:id/report` | Полный отчёт по одной ссылке: резюме, рынок, аудитории, эффективность, риски, эксперименты, источники, история |
-| Прогоны и эффективность | `/ideas/:id/runs` | Исходный процесс vs варианты решения, журнал вызовов компонентов, формулы, статистические интервалы, сценарии |
-| Настройки | `/settings` | Управляемые параметры: этапы пайплайна, лимиты очереди, границы прототипа. Кнопка «Режим разработчика» показывает технические детали (id шагов, сырые выходы агентов, seed) |
-
----
-
-### Как пользоваться
-
-#### Создать идею
-
-1. Откройте «Новая идея».
-2. Наберите текст или нажмите кнопку записи и продиктуйте идею — запись расшифровывается автоматически (расшифровку можно поправить руками).
-3. Выберите приоритет (высокий / средний / низкий) и сохраните. Идея появится в воронке как черновик; заголовок подставится автоматически из текста.
-
-#### Запустить анализ и следить за ходом
-
-1. На карточке идеи нажмите «Запустить анализ». Идея встанет в очередь, затем этапы будут выполняться один за другим.
-2. Ход виден в карточке в реальном времени: какой этап занят, что уже готово. Закрыть вкладку можно — выполнение продолжается на сервере.
-3. Дождитесь стадии «Решение» и откройте отчёт.
-
-#### Управлять выполнением
-
-Из карточки или списка доступны:
-
-- «Пауза» и «Продолжение» — выполнение останавливается на текущем шаге и продолжается с него же, не с нуля.
-- «Отмена» — прогон прекращается.
-- «Повтор шага» — перезапуск конкретного этапа с того места, где он остановился.
-- «Смена приоритета» — высокоприоритетные идеи обрабатываются раньше.
-
-Повторный клик «Запустить» не создаёт дубль: у каждого запуска есть защита от повторной постановки.
-
-#### Если что-то пошло не так
-
-На карточке видно технический статус. «Ошибка» — шаг упал, его можно повторить. «Ожидает данных» — прогон приостановлен до появления нужных данных. Каждое сообщение об ошибке в сервисе состоит из трёх частей: что случилось, почему и что делать; все три видны пользователю.
-
----
-
-### Отчёт: из чего состоит и как читать
-
-Отчёт собирается после полного прогона и всегда доступен по одной ссылке. Разделы:
-
-- Резюме и решение: итог, балл, рекомендация, стоп-факторы.
-- Рынок: границы рынка, конкуренты и альтернативы (не менее трёх; если найдено меньше — это сказано прямо).
-- Аудитория и гипотезы: прото-персоны, боли, проверяемые гипотезы — что проверить, каким экспериментом, по какой метрике и порогу успеха.
-- Эффективность и прогноз: числа из расчётного модуля — формула, доверительный интервал, три сценария (см. ниже).
-- Слабые места и риски: находки критика — технические, операционные, рыночные, правовые.
-- Эксперименты и метрики: что и в каком порядке проверять дальше.
-- Источники: каждый факт снабжён ссылкой и пометкой, что именно он поддерживает.
-- История: предыдущие версии отчёта не удаляются при изменении идеи.
-
-#### Как читать пометки у утверждений
-
-Все утверждения в отчёте различаются по природе:
-
-| Пометка | Что это значит |
-|---------|----------------|
-| Факт | Подтверждено источником (ссылка + дата) |
-| Оценка | Экспертное суждение, не подтверждено источником |
-| Прогноз | Предположение о будущем |
-| Симуляция | Результат модельного датасета, не измерение реального процесса |
-| Синтетика | ИИ сыграл роль персоны — это не подтверждение спроса |
-
-#### Рекомендация
-
-Итог отчёта — одна из пяти рекомендаций:
-
-| Рекомендация | Смысл |
-|--------------|-------|
-| Развивать | Идея обоснована — двигаться дальше |
-| Сначала провалидировать | Идея перспективна, но есть непроверенные ключевые допущения |
-| Отложить | Смысл есть, но сейчас не время (например, эффект слишком мал) |
-| Отклонить | Оснований продолжать нет |
-| Недостаточно данных | Данных для вывода не хватает |
-
-Общий балл не может «спрятать» стоп-фактор: если стоп-фактор найден, рекомендация не может быть «развивать».
-
----
-
-### Расчёт эффекта: что считается и насколько ему можно верить
-
-Главное здесь: эффект считает программа, а не ИИ. ИИ выбирает методику и комментирует, но каждое число берётся из воспроизводимого вычисления на сервере.
-
-Что внутри расчёта:
-
-1. База — показатели исходного процесса (сколько времени и ошибок стоит обработка без ИИ). В прототипе база — модельный датасет на 200 обращений, и в отчёте он помечен как `симуляция`, а не как измерение реального процесса.
-2. Математическая модель — явная формула (например: время = базовое − ИИ-обработка − ручная проверка). Формула, параметры и единицы видны в отчёте, эффект не задваивается.
-3. Статистическая модель — доверительный интервал 95% для разницы средних методом bootstrap (10 000 пересчётов со случайной выборкой, фиксированный seed).
-4. Три сценария — базовый, благоприятный, неблагоприятный; плюс чувствительность к объёму задач, качеству ИИ и доле ручной доработки (±20%).
-
-#### Воспроизводимость
-
-Тот же вход и тот же seed дают ровно тот же результат, вплоть до последнего знака; это проверено автотестом. Формула, версия модели, параметры, seed, входные данные и результат хранятся в базе, а не только в тексте отчёта.
-
-#### Когда числа меняют рекомендацию автоматически
-
-- Эффект меньше 0,5 минуты на операцию → рекомендация «отложить».
-- Качество классификации ниже порога 85% или доверительный интервал включает «без изменений» → рекомендация «сначала провалидировать».
-
-Пороги решения заданы заранее, а не подбираются под красивый вывод.
-
----
-
-### Правила и ограничения
-
-- Лимит 10 активных идей. Одиннадцатая не принимается — сервис объясняет это и предлагает заархивировать завершённую идею; архивирование освобождает место.
-- Приоритеты очереди. Высокий > средний > низкий; при равенстве — кто раньше встал. «Низкие» не застревают навсегда: идея, ждущая дольше 15 минут, автоматически поднимается на шаг в приоритете (анти-голодание).
-- Один обработчик очереди. Параллельная обработка всех 10 идей не требуется: очередь обрабатывается последовательно, состояние выполнения живёт на сервере.
-- Версии идей. Изменение идеи после анализа создаёт новую версию; зависимые выводы помечаются устаревшими, повторный анализ обновляет только нужные этапы, старый отчёт остаётся в истории.
-- Честные упрощения прототипа, все видны на экране «Настройки»:
-  - 12 ролей из техзадания консолидированы до 7 этапов (объединение близких ролей разрешено ТЗ);
-  - базовые метрики исходного процесса — модельный датасет (симуляция);
-  - до MVP доводится одна «сквозная» идея, остальные кейсы — облегчённые;
-  - автоматические проверки доступности интерфейса сняты; доступность проверяется ревью разметки и клавиатурным проходом.
-
----
-
-### Данные, доступы и безопасность
-
-- Доступы: владелец может менять идеи и запускать анализ; проверяющий получает демо-доступ «только чтение». Изменить чужую идею подстановкой идентификатора нельзя.
-- Ключи хранятся только на сервере: не в коде интерфейса, не в репозитории, не в логах.
-- Внешним сервисам уходит: текст идеи (LLM-провайдеру для анализа) и аудиозапись (сервису расшифровки речи). Сколько провайдеры хранят данные — на их условиях; внутри сервиса текст идеи в логи не пишется.
-- Prompt injection: текст идеи и страницы из сети — данные, а не инструкции. Попытки «заставить» агента раскрыть ключ или проигнорировать правила предусмотрены; защита заложена в промпты ролей.
-- Удаление идеи удаляет и её аудиофайлы, и все результаты: карточка, версии, прогоны, расчёты и отчёты связаны каскадно.
-- Каждый запрос получает идентификатор (заголовок `X-Request-Id`) и записывается в журнал одним «широким событием»: по нему видно, какая идея, какой шаг, сколько занял и чем закончил.
-
----
-
-### Словарик
-
-| Термин | Что это |
-|--------|---------|
-| Идея | Предложение ИИ-решения или микросервиса, поданное текстом или голосом |
-| Карточка | Структурированное описание идеи: суть, проблема, аудитория, ценность, приоритет, статус |
-| Воронка | Последовательность стадий от черновика до MVP/архива |
-| Прогон | Один полный цикл анализа идеи всеми этапами |
-| Роль | Настроенный ИИ-агент с конкретным заданием (аналитик рынка, критик и т.д.) |
-| Отчёт | Итоговый документ по прогону с рекомендацией |
-| MVP | Минимально работающий продукт по выбранной идее |
-| Seed | Фиксированное «зерно» случайности — гарантирует тот же результат при повторном расчёте |
-
----
-
-### Для инженеров
-
-#### Стек (кратко)
-
-Nuxt 4 (Vue 3, Nitro) + TypeScript · PostgreSQL 16 + Prisma 8 · очередь на Postgres + LangGraph.js (StateGraph, checkpointing в Postgres) · LLM — любой OpenAI-совместимый провайдер (конфиг: `config/llm.ts`), STT — routerai.ru · Zod-валидация на границах · evlog (wide events + структурированные ошибки `code/why/fix`) · Vitest + Playwright · Docker.
-
-#### Структура
-
-```
-app/              Frontend (фичи: funnel, create-idea, ideas, jobs, report, runs, settings, voice-input)
-server/api/       REST API (ideas, jobs, transcribe, health)
-server/queue/     Очередь на Postgres + LangGraph-воркер, исполнители шагов (llm / calc / fixture)
-server/utils/     БД, LLM-клиент, STT, клиент валидатора, расчётный модуль efficiency/
-shared/           Общий код: zod-схемы, русские названия фаз и полей
-config/           Конфиги пайплайна, ролей и компонентов (LLM, STT, валидатор)
-services/validator/  Микросервис-валидатор правил (node:http, отдельный контейнер)
-src/prisma/       Prisma-контракт БД
-docs/             ARCHITECTURE.md, conventions.md
-```
-
-#### Запуск (разработка)
-
-```bash
-# требуется: Node.js LTS, pnpm (corepack enable), Docker
-cp .env.example .env   # заполнить ключи
-docker compose up -d db   # PostgreSQL (порт 5433)
-pnpm install
-pnpm db:migrate        # применить миграции
-pnpm dev               # http://localhost:3000
-pnpm worker            # отдельный воркер очереди (в dev можно и без него)
-```
-
-#### Деплой (продакшн)
-
-```bash
-docker compose -f docker-compose.prod.yml up -d db
-docker compose -f docker-compose.prod.yml --profile setup run --rm migrate   # миграции (одноразово)
-docker compose -f docker-compose.prod.yml up -d web worker
-```
-
-Контейнеры: `db` (PostgreSQL 16, 127.0.0.1:5433), `web` (SSR + API, 127.0.0.1:3000), `worker` (тот же образ, `WORKER_MODE=true`), `validator` (127.0.0.1:3001), `migrate` (one-shot). Перед web стоит Caddy с TLS. Есть вариант `docker-compose.dokploy.yml` для Dokploy.
-
-#### Команды
-
-| Команда | Описание |
-|---------|----------|
-| `pnpm dev` / `pnpm build` / `pnpm preview` | Dev-сервер / сборка / локальный превью |
-| `pnpm lint` / `pnpm lint:fix` | ESLint (+ автофикс; запускается на pre-commit через husky + lint-staged) |
-| `pnpm typecheck` | Проверка типов (vue-tsc через Nuxt) |
-| `pnpm test` | Unit/интеграционные тесты (Vitest) |
-| `pnpm e2e` / `pnpm e2e:ui` | E2E-тесты (Playwright, Chromium) |
-| `pnpm db:migrate` / `db:new` / `db:status` | Миграции Prisma |
-| `pnpm worker` | Standalone-воркер очереди (`tsx server/queue/worker-cli.ts`) |
-| `pnpm skills` | Установка AI-скиллов из `skills-lock.json` (см. `AGENTS.md`) |
-
-#### Переменные окружения
-
-| Переменная | Обязательна | Описание |
-|------------|-------------|----------|
-| `DATABASE_URL` | да | Подключение к PostgreSQL |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | да | Для контейнера БД |
-| `LLM_API_KEY` | да | Ключ LLM-провайдера (генерация) |
-| `LLM_BASE_URL` / `LLM_MODEL` | нет | Адрес OpenAI-совместимого API и модель (по умолчанию — из `config/llm.ts`) |
-| `ROUTERAI_API_KEY` | да | Ключ расшифровки речи (STT) — отдельный сервис |
-| `VALIDATOR_URL` | да | Адрес микросервиса-валидатора (`http://validator:3001`) |
-| `WORKER_MODE` | нет | `true` — процесс обрабатывает очередь (сервис worker) |
-| `LANGSMITH_API_KEY` / `LANGSMITH_TRACING` / `LANGSMITH_PROJECT` | нет | Трейсинг LLM-вызовов (LangSmith) |
-| `APP_ENV` | нет | `production` / `development` |
-
-#### API
-
-- Идеи: `GET/POST /api/ideas`, `GET/PATCH/DELETE /api/ideas/:id`, `POST /api/ideas/:id/run` (запуск анализа), `POST /api/ideas/:id/mvp`; отчёт, расчёты, прогоны, выходы этапов и материалы фаз: `GET /api/ideas/:id/{report,calculations,runs,outputs,latest-job}`, `GET /api/ideas/:id/phases/:role/materials`.
-- Задачи: `GET /api/jobs/:id`, `GET /api/jobs/:id/stream` (SSE-обновления статуса), `POST /api/jobs/:id/{pause,resume,cancel,retry-step}`, `PATCH /api/jobs/:id/priority`.
-- Прочее: `POST /api/transcribe` (расшифровка аудио), `GET /api/health` (`{ db, status, timestamp }`, 503 если БД недоступна), `GET /docs/:name` (`ARCHITECTURE`, `CONVENTIONS`, `DEVLOG`, `TZ`).
-- Ошибки единообразны: `{ status, message, data: { code, why, fix } }`.
-- Версионирование — через URL (`/api/v1/...` зарезервировано на будущее).
-
-#### Микросервис-валидатор
-
-Отдельный процесс без доступа к ключам и БД оркестратора. Контракт: `POST /validate` → `{ valid, errors[] }`, `GET /version`. Проверяет обязательные поля, допустимые категории и приоритеты, согласованность (например: «жалоба» → приоритет не ниже среднего).
-
-#### Документация в репозитории
-
-| Файл | Содержимое |
-|------|-----------|
-| `docs/ARCHITECTURE.md` | Стек, архитектура, потоки данных, детали очереди и LLM-слоя |
-| `docs/conventions.md` | Конвенции кода и работы с репозиторием |
-| `TZ.md` | Техзадание: требования, методика, границы прототипа, реестр допущений |
-| `DESIGN.md` | Визуальный язык интерфейса |
-| `DEVLOG.md` | Журнал агентной разработки: запрос → план → результат → проверка |
-| `AGENTS.md` | Правила работы AI-агентов с этим репозиторием |
-
-Те же документы (`ARCHITECTURE`, `CONVENTIONS`, `DEVLOG`, `TZ`) открываются из работающего сервиса: `/docs/ARCHITECTURE` и т.д.
+No license yet. Ask before reusing the code.
