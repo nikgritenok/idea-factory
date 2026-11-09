@@ -81,4 +81,4 @@ Issues and pull requests are welcome. Run the test suite before opening a PR.
 
 ## License
 
-No license yet. Ask before reusing the code.
+MIT, see [LICENSE](LICENSE).
